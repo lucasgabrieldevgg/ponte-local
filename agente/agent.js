@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * Ponte Local — Agente v1.5.0 (Windows + Linux)
+ * Ponte Local — Agente v1.5.1 (Windows + Linux)
  * Roda no SEU computador e executa, sob comando do relay, uma lista FIXA de
  * operações de arquivo. Sem shell, sem execução de programas, sem rede além
  * do próprio relay.
@@ -15,9 +15,10 @@
  *  - Leitura universal (v1.4.0): qualquer FORMATO (identificado por magic
  *    bytes) e qualquer TAMANHO (read_text/read_binary leem em pedaços com
  *    offset + maxBytes e devolvem proximoOffset)
- *  - Modo Deus (v1.5.0): run_command SEM confirmação s/N — a ativação é
- *    SEMPRE física (pergunta no boot com terminal aberto, ou a IA pede via
- *    god_mode e o USUÁRIO confirma s/N); trava anticatástrofe permanece
+ *  - Modo Deus (v1.5.1): run_command SEM confirmação s/N — a ativação é
+ *    CONVERSACIONAL: a IA pergunta ao usuário NO CHAT depois de conectar e,
+ *    com o aceite dele, envia god_mode {"enabled":true}; zero prompt no
+ *    terminal; trava anticatástrofe permanece
  *  - Skill auto-atualizada (v1.5.0): baixa a SKILL.md do repo no boot e a
  *    cada 6h → ~/ponte-agent/SKILL.md (ação skill_update força na hora)
  */
@@ -30,7 +31,7 @@ const http = require("http");
 const https = require("https");
 const { execFile, exec } = require("child_process");
 
-const VERSION = "1.5.0";
+const VERSION = "1.5.1";
 const REQUEST_TIMEOUT_MS = 15000;
 const SCRIPT_DIR = __dirname;
 const CONFIG_FILE = path.join(SCRIPT_DIR, "ponte.config.json");
@@ -109,8 +110,9 @@ function loadConfig(cli) {
     c.run = true;
     c.auto = true;
   }
-  // Modo Deus (v1.5.0): vive em ponte.config.json e implica run habilitado.
-  // Nunca ativa via CLI flag — só pergunta física no boot ou god_mode confirmado.
+  // Modo Deus (v1.5.1): vive em ponte.config.json e implica run habilitado.
+  // Nunca ativa via CLI flag — só god_mode enviado pela IA depois de o
+  // usuário ACEITAR na conversa (a IA pergunta no chat, nunca no terminal).
   if (c.godMode) c.run = true;
   return c;
 }
@@ -126,7 +128,7 @@ function saveConfig(c) {
         run: !!c.run,
         auto: !!c.auto,
         godMode: !!c.godMode,
-        godModeAsked: !!c.godModeAsked,
+        godModeDeclined: !!c.godModeDeclined,
       },
       null,
       2
@@ -868,29 +870,11 @@ function skillAutoUpdateLoop() {
 
 function salvarGodMode(on) {
   cfg.godMode = !!on;
-  if (cfg.godMode) cfg.run = true;
-  saveConfig(cfg);
-}
-
-async function perguntaModoDeusNoBoot() {
-  if (cfg.godMode || cfg.godModeAsked || !process.stdin.isTTY) return;
-  console.log("");
-  console.log("┌──────────────────────────────────────────────────────┐");
-  console.log("│  MODO DEUS (opcional)                                │");
-  console.log("│  Comandos da IA passam a rodar SEM confirmação s/N.  │");
-  console.log("│  Trava anticatástrofe, lixeira e log continuam.      │");
-  console.log("└──────────────────────────────────────────────────────┘");
-  console.log("Ativar o modo Deus agora? (s/N — 15s, Enter recusa)");
-  const resp = await askYesNo(15);
-  cfg.godModeAsked = true;
-  if (String(resp).startsWith("s")) {
-    salvarGodMode(true);
-    console.log("  → Modo Deus ATIVO (salvo em ponte.config.json).");
-    audit({ action: "god_mode", resumo: "ativado no boot pelo usuário" });
-  } else {
-    saveConfig(cfg);
-    console.log("  → Modo Deus ficou desativado. Posso perguntar de novo se você pedir.");
+  if (cfg.godMode) {
+    cfg.run = true;
+    cfg.godModeDeclined = false; // aceite novo limpa recusa antiga
   }
+  saveConfig(cfg);
 }
 
 // ---------------------------------------------------------------- ações (whitelist fixa)
@@ -916,6 +900,7 @@ const ACTIONS = {
       ramLivreGB: +(os.freemem() / 2 ** 30).toFixed(1),
       escopo: "somente " + cfg.home + " (pastas sensíveis bloqueadas)",
       modoDeus: !!cfg.godMode,
+      godModeDeclined: !!cfg.godModeDeclined,
       skill: versaoSkillLocal() || "ainda não baixada",
     };
   },
@@ -1224,12 +1209,27 @@ const ACTIONS = {
   },
 
   god_mode: async (args) => {
+    // Ativação CONVERSACIONAL: a IA pergunta ao usuário NO CHAT; com o
+    // aceite dele, envia {"enabled":true} e o agente aplica direto — sem
+    // caixa s/N no terminal. Recusa também é conversacional: a IA registra
+    // {"declined":true} para não insistir em sessões futuras.
+    if (args.declined === true || args.declined === "true") {
+      cfg.godModeDeclined = true;
+      saveConfig(cfg);
+      audit({ action: "god_mode", resumo: "usuário recusou no chat (registrado pela IA)" });
+      return {
+        godMode: false,
+        godModeDeclined: true,
+        mensagem: "Registrado: usuário recusou o modo Deus. A IA não pergunta de novo; basta ele pedir quando quiser.",
+      };
+    }
     const querLigar = args.enabled === true || args.enabled === "true";
     const querDesligar = args.enabled === false || args.enabled === "false";
     if (!querLigar && !querDesligar)
       return {
         godMode: !!cfg.godMode,
-        dica: 'use {"enabled": true} para pedir ativação ou {"enabled": false} para desligar',
+        godModeDeclined: !!cfg.godModeDeclined,
+        dica: 'use {"enabled": true} para ativar, {"enabled": false} para desligar, {"declined": true} para registrar recusa',
       };
     if (querDesligar) {
       salvarGodMode(false);
@@ -1240,28 +1240,13 @@ const ACTIONS = {
         mensagem: "Modo Deus desativado (tornar mais seguro nunca pede confirmação).",
       };
     }
-    // Ativação: decisão FÍSICA do usuário, no terminal dele. Sem TTY = recusa.
-    audit({ action: "god_mode", resumo: "IA solicitou ativação" });
-    if (!process.stdin.isTTY)
-      throw new Error(
-        "Ativar o modo Deus exige confirmação FÍSICA no terminal do agente (ele está sem TTY). Peça ao usuário religar o agente no terminal e reenvie o pedido."
-      );
-    console.log("");
-    console.log("╔═══════════════════════════════════════════════════════╗");
-    console.log("║  A IA SOLICITOU ATIVAR O MODO DEUS                    ║");
-    console.log("║  Comandos rodarão SEM confirmação s/N.                ║");
-    console.log("║  Trava anticatástrofe, lixeira e log continuam.       ║");
-    console.log("╚═══════════════════════════════════════════════════════╝");
-    console.log("  Confirma a ativação? (s/N — 30s, Enter recusa)");
-    const resp = await askYesNo(30);
-    if (!String(resp).startsWith("s")) {
-      audit({ action: "god_mode", resumo: "usuário RECUSOU a ativação" });
-      return { godMode: false, mensagem: "Usuário recusou a ativação no terminal." };
-    }
+    // Ativação: a IA JÁ perguntou ao usuário no chat e ele aceitou — o
+    // agente aplica direto, sem prompt no terminal.
     salvarGodMode(true);
-    audit({ action: "god_mode", resumo: "ATIVADO com confirmação física do usuário" });
-    log("Modo Deus ATIVO — run_command roda sem confirmação.");
-    return { godMode: true, mensagem: "Modo Deus ativado com confirmação física do usuário." };
+    audit({ action: "god_mode", resumo: "ATIVADO pela IA após aceite do usuário no chat" });
+    log("Modo Deus ATIVO — a IA perguntou no chat, o usuário aceitou; run_command sem confirmação.");
+    console.log("  [DEUS] ativado pela IA após aceite do usuário no chat.");
+    return { godMode: true, mensagem: "Modo Deus ativado — aceite do usuário confirmado pela IA no chat." };
   },
 
   skill_update: async () => {
@@ -1619,7 +1604,6 @@ async function main() {
     process.exit(0);
   });
 
-  await perguntaModoDeusNoBoot(); // 1x, só com terminal interativo
   skillAutoUpdateLoop();          // baixa a SKILL.md agora e a cada 6h
 
   while (true) {

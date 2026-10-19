@@ -98,7 +98,7 @@ ou `--auto` no SEU terminal — a IA não consegue ligar modos sozinha.
 A trava é física: o comando só roda se VOCÊ apertar Enter no SEU teclado.
 Se o agente rodar em background (sem terminal), nada é executado.
 
-## Modo Deus (opcional — a decisão é sua, no seu teclado)
+## Modo Deus (opcional — a decisão é sua, no chat)
 
 O **modo Deus** desliga as confirmações `s/N` do `run_command`: a IA passa a
 executar comandos sem você apertar nada. O que continua igual de jeito
@@ -106,13 +106,11 @@ nenhum: a trava anticatástrofe (recusa `rm -rf` na raiz/home/sistema, `mkfs`,
 `dd` em disco etc.), pastas sensíveis bloqueadas, exclusão só via lixeira
 com `undo_last`, e tudo registrado em `ponte-log.jsonl`.
 
-- **No primeiro boot com terminal aberto** o agente pergunta se você quer
-  ativar (s/N — 15 s; Enter recusa). A resposta fica salva em
-  `ponte.config.json` (`"godMode": true`).
-- **A IA pode pedir** a ativação — aparece uma caixa no terminal e VOCÊ
-  confirma com `s` em 30 s. Sem resposta = recusa. Agente rodando em
-  background (sem terminal): a ativação é recusada com erro. Não existe
-  forma da IA ligar isso sozinha.
+- **A IA pergunta você NO CHAT**, logo depois que a ponte conecta — nada de
+  digitar s/N no terminal. Você aceita na conversa, a IA envia o comando e
+  pronto: fica salvo em `ponte.config.json` (`"godMode": true`).
+- Se você recusar, a IA registra a recusa e não pergunta de novo — mas
+  basta você pedir ("ativa o modo Deus") que ela ativa na hora.
 - **Desligar é livre e imediato**: a IA manda `god_mode {"enabled": false}`
   ou você edita o `ponte.config.json`. Desligado, o `run_command` volta ao
   modo anterior (supervisionado volta a pedir `s/N`).
@@ -131,7 +129,7 @@ da skill e se o modo Deus está ativo.
 - **Com o run_command desligado** (padrão): não executa nenhum comando de shell
 - **No modo supervisionado**: nenhum comando roda sem você digitar "s" no terminal — e cada comando aparece por completo antes
 - **No modo autônomo**: comandos rodam sem confirmação, MAS a trava anticatástrofe recusa os que destroem o sistema de uma vez (no Windows: `format`, `diskpart`, `rd /s` em raiz de drive etc.), e TUDO fica registrado em `ponte-log.jsonl`
-- **No modo deus**: igual ao autônomo — sem `s/N`, mas a trava anticatástrofe segue recusando padrões de destruição, e ativação só aconteceu com você confirmando no terminal
+- **No modo deus**: igual ao autônomo — sem `s/N`, mas a trava anticatástrofe segue recusando padrões de destruição, e a ativação só aconteceu porque você aceitou no chat
 - Não acessa nada fora da sua home (ações de arquivo)
 - Não toca em pastas sensíveis: `.ssh`, `.gnupg`, `.config`, `.password-store`,
   `.aws`, `.kube`

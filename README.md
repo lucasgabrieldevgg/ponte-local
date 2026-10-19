@@ -43,7 +43,8 @@ saída** (poll a cada 1,5 s), então funciona atrás de NAT e firewall doméstic
   magic bytes (png, pdf, exe, mp4, zip…) e `read_text`/`read_binary` leem
   arquivos de **qualquer tamanho** por pedaços (`offset` → `proximoOffset`).
   Desde a **v1.5.0**, **modo Deus** opcional (run_command sem confirmações s/N —
-  ativação sempre com confirmação física do usuário) e **skill que se
+  desde a v1.5.1 a ativação é conversacional: a IA pergunta no chat após
+  conectar e ativa; nada no terminal) e **skill que se
   auto-atualiza**: o agente baixa a SKILL.md do repo no boot e a cada 6 h.
 - **Relay** (VM/servidor) — fila com entrega exclusiva (claim/lease), sequência
   persistida em disco e painel web com status em tempo real.
@@ -142,7 +143,7 @@ A referência completa com argumentos exatos está na [tabela da SKILL.md](SKILL
 ponte-local/
 ├── SKILL.md               ← entrada para IAs: instale e opere (comece aqui)
 ├── agente/
-│   ├── agent.js           ← o agente inteiro: 1 arquivo, 0 dependências (v1.5.0)
+│   ├── agent.js           ← o agente inteiro: 1 arquivo, 0 dependências (v1.5.1)
 │   ├── LEIA-ME.md         ← manual do agente no PC do usuário
 │   ├── rodar.sh           ← religa lendo ponte.config.json (Linux)
 │   └── atualizar.sh       ← baixa a versão nova do agente (Linux)

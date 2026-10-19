@@ -37,11 +37,14 @@ saída** (poll a cada 1,5 s), então funciona atrás de NAT e firewall doméstic
 └──────────────────┘                 └──────────────────────┘               └────────────┘
 ```
 
-- **Agente** (seu PC) — 21 ações de arquivo e comando, escopo travado na sua home,
+- **Agente** (seu PC) — 23 ações de arquivo e comando, escopo travado na sua home,
   lixeira com desfazer e trava anticatástrofe no próprio processo, antes de executar.
   Desde a **v1.4.0**, leitura universal: `file_info` identifica o formato por
   magic bytes (png, pdf, exe, mp4, zip…) e `read_text`/`read_binary` leem
   arquivos de **qualquer tamanho** por pedaços (`offset` → `proximoOffset`).
+  Desde a **v1.5.0**, **modo Deus** opcional (run_command sem confirmações s/N —
+  ativação sempre com confirmação física do usuário) e **skill que se
+  auto-atualiza**: o agente baixa a SKILL.md do repo no boot e a cada 6 h.
 - **Relay** (VM/servidor) — fila com entrega exclusiva (claim/lease), sequência
   persistida em disco e painel web com status em tempo real.
 - **Operador** (CLI Python na VM) — `ponte.py`: a IA injeta comandos e lê resultados
@@ -58,13 +61,14 @@ saída** (poll a cada 1,5 s), então funciona atrás de NAT e firewall doméstic
 | 🔑 **Tokens separados** | Agente e operador usam tokens distintos; comandos de teste ficam num canal isolado |
 | 🧾 **Log JSONL** | Toda ação fica registrada em `ponte-log.jsonl`, com resumo e dados de undo |
 
-## Os 3 modos do `run_command`
+## Os 4 modos do `run_command`
 
 | Modo | Você religa com | Comportamento |
 |------|-----------------|---------------|
 | **Desligado** (padrão) | `node agent.js` | Só operações de arquivo — IA não executa comandos |
 | **Supervisionado** | `node agent.js --allow-run --save` | Cada comando aparece no **seu** terminal; `s`/`N` em 60 s, sem resposta = rejeita |
 | **Autônomo** | `node agent.js --auto --save` | Executa direto (loga `[AUTO] $ cmd`), **com a trava anticatástrofe sempre ativa** |
+| **Modo Deus** | pergunta no 1º boot, ou a IA pede `god_mode` e **você** confirma `s/N` no terminal | Igual ao autônomo: sem `s/N` (loga `[DEUS] $ cmd`); trava, lixeira e log continuam; desligar é livre (`god_mode {"enabled":false}`) — sem terminal, a ativação é recusada |
 
 A troca de modo é sempre **física**: só você, digitando o flag no terminal do seu PC.
 
@@ -119,7 +123,7 @@ node agent.js --server https://SEU-RELAY --token SEU_TOKEN --save
 > `Invoke-WebRequest` e quebra o download. Próximas execuções: `~/ponte-agent/rodar.sh`
 > (Linux) ou `cd $HOME\ponte-agent; node agent.js` (Windows).
 
-## As 21 ações do agente
+## As 23 ações do agente
 
 | Grupo | Ações |
 |-------|-------|
@@ -127,7 +131,8 @@ node agent.js --server https://SEU-RELAY --token SEU_TOKEN --save
 | **Arquivos** | `read_text` (qualquer tamanho, em pedaços) · `write_text` · `mkdir` · `move` · `rename` · `delete` → lixeira · `restore` · `undo_last` |
 | **Organizar** | `organize_plan` (propõe, não executa) · `apply_plan` (lote aprovado) · `duplicates` (md5 + espaço recuperável) |
 | **Binários** | `read_binary` (por pedaços, sem teto de tamanho) · `write_binary` (até 8 MB — via `ponte.py pegar`/`enviar`) |
-| **Comando** | `run_command` (com os 3 modos acima) |
+| **Comando** | `run_command` (com os modos acima) |
+| **Controle** | `god_mode` (liga/desliga as confirmações — ativação só com s/N físico seu) · `skill_update` (força o download da SKILL.md; o agente também atualiza sozinho no boot e a cada 6 h) |
 
 A referência completa com argumentos exatos está na [tabela da SKILL.md](SKILL.md#fase-4--operar-referência-das-ações).
 
@@ -137,7 +142,7 @@ A referência completa com argumentos exatos está na [tabela da SKILL.md](SKILL
 ponte-local/
 ├── SKILL.md               ← entrada para IAs: instale e opere (comece aqui)
 ├── agente/
-│   ├── agent.js           ← o agente inteiro: 1 arquivo, 0 dependências (v1.4.0)
+│   ├── agent.js           ← o agente inteiro: 1 arquivo, 0 dependências (v1.5.0)
 │   ├── LEIA-ME.md         ← manual do agente no PC do usuário
 │   ├── rodar.sh           ← religa lendo ponte.config.json (Linux)
 │   └── atualizar.sh       ← baixa a versão nova do agente (Linux)

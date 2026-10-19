@@ -8,10 +8,14 @@ description: >-
   trava anticatástrofe. Use quando o usuário pedir para você mexer no
   computador dele: organizar arquivos, procurar coisas, rodar comandos,
   trocar configurações do desktop, automatizar tarefas locais, ler arquivos
-  de qualquer formato ou tamanho (leitura por pedaços com file_info/offset).
-  Se a ponte já está no ar, qualquer IA (Claude, Manus…) opera só com a URL e
+  de qualquer formato ou tamanho (leitura por pedaços com file_info/offset),
+  com modo Deus opcional (run_command sem confirmações s/N — ativação sempre
+  física do usuário) e skill que o agente atualiza sozinho do repo. Se a
+  ponte já está no ar, qualquer IA (Claude, Manus…) opera só com a URL e
   o ADMIN_TOKEN — sem hospedar nada.
 ---
+
+<!-- skill-version: 2.5.0 -->
 
 # Ponte Local — skill de operação remota do PC do usuário
 
@@ -346,6 +350,8 @@ aceita ambos os estilos conforme o SO dele.
 | `file_info` | `{"path":"..."}` | Tipo REAL do arquivo (magic bytes: png, jpeg, pdf, zip, exe, mp4, sqlite, gzip, iso…) + tamanho + encoding se for texto + dica de como ler |
 | `write_binary` | `{"path":"...","base64":"...","overwrite":true}` | Grava binário (máx 8 MB) |
 | `run_command` | `{"command":"...","cwd":"C:\\Users\\u","timeoutMin":3}` | Shell — exige modo habilitado (abaixo) |
+| `god_mode` | `{"enabled":true}` / `{"enabled":false}` | Modo Deus: liga (só com s/N FÍSICO do usuário no terminal) / desliga (direto) as confirmações do `run_command` — seção própria abaixo |
+| `skill_update` | `{}` | Força o download da SKILL.md mais recente deste repo; devolve `atualizou`, `de`, `para`, `versaoLocal` (o agente também atualiza sozinho no boot e a cada 6 h) |
 
 Resposta de cada comando: `{"id","ok","data"|"error","durationMs","ts"}`.
 
@@ -388,6 +394,7 @@ pedaço traz os bytes do cabeçalho em base64. O mesmo funciona para log de
 | Desligado (padrão) | `node agent.js` | `run_command` negado; só operações de arquivo |
 | Supervisionado | `node agent.js --allow-run --save` | Caixa no terminal dele, `s`/`N` em 60 s; sem resposta = rejeita |
 | Autônomo | `node agent.js --auto --save` | Executa direto, loga `[AUTO] $ cmd`, trava anticatástrofe ativa |
+| **Modo Deus** | pergunta no 1º boot, ou a IA pede `god_mode` e o **usuário** confirma `s/N` no terminal | Igual ao autônomo: sem `s/N` (log `[DEUS] $ cmd`); trava anticatástrofe, lixeira e log continuam; desliga com `god_mode {"enabled":false}` — sem TTY, ativação é recusada |
 
 Só o usuário pode trocar de modo (digitar o flag no terminal DELE). Peça com
 clareza, ex.: *"Ctrl+C no terminal do agente e rode `node agent.js --auto --save`
@@ -396,6 +403,37 @@ clareza, ex.: *"Ctrl+C no terminal do agente e rode `node agent.js --auto --save
 
 Ao comandar em modo supervisionado, use `PONTE_WAIT_S=150` (ou mais) — a
 espera padrão do operador precisa cobrir os 60 s do prompt + execução.
+
+## Modo Deus + skill que se atualiza sozinha (agente v1.5.0)
+
+**Modo Deus** = o agente para de pedir confirmação `s/N` para `run_command`.
+O que NÃO muda de jeito nenhum: trava anticatástrofe (bloqueio físico de
+`rm -rf` em raiz/home/sistema, `mkfs`, `dd` em disco, fork bomb…), pastas
+sensíveis bloqueadas, exclusões via lixeira com `undo_last` e o log
+`ponte-log.jsonl`.
+
+- **Ativação — sempre física.** O agente pergunta no primeiro boot com
+  terminal aberto (s/N, 15 s). A IA pode pedir com
+  `{"action":"god_mode","args":{"enabled":true}}` — aparece a caixa no
+  terminal do usuário e ELE decide em 30 s (sem resposta = recusa). Agente
+  rodando sem TTY (background): a ativação é **recusada com erro** — não
+  existe caminho da IA ligar sozinha.
+- **Desativação — livre.** `{"action":"god_mode","args":{"enabled":false}}`
+  desliga na hora (tornar mais seguro nunca pede confirmação); ao desligar,
+  o `run_command` volta ao modo anterior (supervisionado volta a pedir
+  `s/N`). O usuário também pode editar `ponte.config.json`.
+- Antes de pedir ativação, EXPLIQUE ao usuário o que isso significa e
+  confirme por texto que ele quer a caixa `s/N` no terminal dele. O estado
+  atual aparece no `ping` (`modoDeus`) e no banner do agente.
+
+**Skill auto-atualizada.** O agente baixa a `SKILL.md` mais recente deste
+repo (raw.githubusercontent) no boot e a cada 6 h, salvando em
+`~/ponte-agent/SKILL.md` (Windows: `%USERPROFILE%\ponte-agent\SKILL.md`).
+A IA que opera DENTRO do PC do usuário deve preferir esse arquivo local —
+é sempre a versão vigente. A versão da skill vai no marcador
+`<!-- skill-version: X.Y.Z -->` no topo do arquivo. Verifique/force com
+`{"action":"skill_update","args":{}}` (devolve `atualizou`, `de`, `para`,
+`versaoLocal`); o `ping` também traz `skill` e `modoDeus`.
 
 ## Sudo sem expor senha (padrão seguro) — Linux, só com autorização explícita
 

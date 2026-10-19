@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * Ponte Local — Agente v1.4.0 (Windows + Linux)
+ * Ponte Local — Agente v1.5.0 (Windows + Linux)
  * Roda no SEU computador e executa, sob comando do relay, uma lista FIXA de
  * operações de arquivo. Sem shell, sem execução de programas, sem rede além
  * do próprio relay.
@@ -15,6 +15,11 @@
  *  - Leitura universal (v1.4.0): qualquer FORMATO (identificado por magic
  *    bytes) e qualquer TAMANHO (read_text/read_binary leem em pedaços com
  *    offset + maxBytes e devolvem proximoOffset)
+ *  - Modo Deus (v1.5.0): run_command SEM confirmação s/N — a ativação é
+ *    SEMPRE física (pergunta no boot com terminal aberto, ou a IA pede via
+ *    god_mode e o USUÁRIO confirma s/N); trava anticatástrofe permanece
+ *  - Skill auto-atualizada (v1.5.0): baixa a SKILL.md do repo no boot e a
+ *    cada 6h → ~/ponte-agent/SKILL.md (ação skill_update força na hora)
  */
 "use strict";
 
@@ -25,11 +30,15 @@ const http = require("http");
 const https = require("https");
 const { execFile, exec } = require("child_process");
 
-const VERSION = "1.4.0";
+const VERSION = "1.5.0";
 const REQUEST_TIMEOUT_MS = 15000;
 const SCRIPT_DIR = __dirname;
 const CONFIG_FILE = path.join(SCRIPT_DIR, "ponte.config.json");
 const LOG_FILE = path.join(SCRIPT_DIR, "ponte-log.jsonl");
+const SKILL_URL =
+  "https://raw.githubusercontent.com/MicaelSanPedro/ponte-local/main/SKILL.md";
+const SKILL_FILE = path.join(SCRIPT_DIR, "SKILL.md");
+const SKILL_CHECK_MS = 6 * 60 * 60 * 1000; // no boot + a cada 6h
 
 let cfg = null; // preenchido no main()
 
@@ -100,6 +109,9 @@ function loadConfig(cli) {
     c.run = true;
     c.auto = true;
   }
+  // Modo Deus (v1.5.0): vive em ponte.config.json e implica run habilitado.
+  // Nunca ativa via CLI flag — só pergunta física no boot ou god_mode confirmado.
+  if (c.godMode) c.run = true;
   return c;
 }
 
@@ -107,7 +119,15 @@ function saveConfig(c) {
   fs.writeFileSync(
     CONFIG_FILE,
     JSON.stringify(
-      { server: c.server, token: c.token, home: c.home, run: !!c.run, auto: !!c.auto },
+      {
+        server: c.server,
+        token: c.token,
+        home: c.home,
+        run: !!c.run,
+        auto: !!c.auto,
+        godMode: !!c.godMode,
+        godModeAsked: !!c.godModeAsked,
+      },
       null,
       2
     )
@@ -724,6 +744,155 @@ const GROUPS = [
 const EXT_TO_GROUP = {};
 for (const [label, exts] of GROUPS) for (const e of exts) EXT_TO_GROUP[e] = label;
 
+// ------------------------------------------- modo Deus + skill (v1.5.0)
+function versaoDe(texto) {
+  const m = String(texto || "").match(/skill-version:\s*(\d+)\.(\d+)\.(\d+)/);
+  return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+}
+
+function versaoSkillLocal() {
+  try {
+    const v = versaoDe(fs.readFileSync(SKILL_FILE, "utf8"));
+    return v ? v.join(".") : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function versaoMaisNova(a, b) {
+  if (!a || !b) return false;
+  for (let i = 0; i < 3; i++) {
+    if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0);
+  }
+  return false;
+}
+
+function httpsGetTexto(url, redirecoes) {
+  redirecoes = redirecoes || 0;
+  return new Promise((resolve, reject) => {
+    let u;
+    try {
+      u = new URL(url);
+    } catch (e) {
+      return reject(new Error("URL inválida"));
+    }
+    const lib = u.protocol === "https:" ? https : http;
+    const req = lib.request(
+      {
+        hostname: u.hostname,
+        port: u.port || (u.protocol === "https:" ? 443 : 80),
+        path: u.pathname + u.search,
+        method: "GET",
+        timeout: 15000,
+        headers: { "user-agent": "ponte-agent/" + VERSION },
+      },
+      (res) => {
+        if (
+          res.statusCode >= 300 &&
+          res.statusCode < 400 &&
+          res.headers.location &&
+          redirecoes < 3
+        )
+          return resolve(
+            httpsGetTexto(new URL(res.headers.location, url).toString(), redirecoes + 1)
+          );
+        const chunks = [];
+        let size = 0;
+        res.on("data", (c) => {
+          size += c.length;
+          if (size > 2 * 1024 * 1024) {
+            req.destroy();
+            reject(new Error("Resposta grande demais"));
+          } else chunks.push(c);
+        });
+        res.on("end", () =>
+          resolve({ status: res.statusCode, texto: Buffer.concat(chunks).toString("utf8") })
+        );
+      }
+    );
+    req.on("timeout", () => req.destroy(new Error("Tempo esgotado")));
+    req.on("error", reject);
+    req.end();
+  });
+}
+
+async function atualizarSkill(origem) {
+  const r = {
+    atualizou: false,
+    de: versaoSkillLocal(),
+    para: null,
+    origem: origem || "auto",
+    erro: null,
+  };
+  try {
+    const { status, texto } = await httpsGetTexto(SKILL_URL);
+    if (status !== 200) {
+      r.erro = "HTTP " + status;
+      return r;
+    }
+    const remota = versaoDe(texto);
+    if (!remota) {
+      r.erro = "skill remota sem marcador de versão";
+      return r;
+    }
+    r.para = remota.join(".");
+    const local = versaoDe(r.de);
+    if (!local || versaoMaisNova(remota, local)) {
+      fs.writeFileSync(SKILL_FILE, texto);
+      const antes = r.de;
+      r.de = antes || "nenhuma";
+      r.atualizou = true;
+      audit({
+        action: "skill_update",
+        resumo: antes
+          ? "skill atualizada v" + antes + " → v" + r.para
+          : "skill baixada v" + r.para,
+      });
+      log(
+        antes
+          ? "Skill atualizada: v" + antes + " → v" + r.para
+          : "Skill baixada: v" + r.para
+      );
+    }
+  } catch (e) {
+    r.erro = e.message;
+  }
+  return r;
+}
+
+function skillAutoUpdateLoop() {
+  atualizarSkill("boot").catch(() => {});
+  const t = setInterval(() => atualizarSkill("periodico").catch(() => {}), SKILL_CHECK_MS);
+  if (t.unref) t.unref();
+}
+
+function salvarGodMode(on) {
+  cfg.godMode = !!on;
+  if (cfg.godMode) cfg.run = true;
+  saveConfig(cfg);
+}
+
+async function perguntaModoDeusNoBoot() {
+  if (cfg.godMode || cfg.godModeAsked || !process.stdin.isTTY) return;
+  console.log("");
+  console.log("┌──────────────────────────────────────────────────────┐");
+  console.log("│  MODO DEUS (opcional)                                │");
+  console.log("│  Comandos da IA passam a rodar SEM confirmação s/N.  │");
+  console.log("│  Trava anticatástrofe, lixeira e log continuam.      │");
+  console.log("└──────────────────────────────────────────────────────┘");
+  console.log("Ativar o modo Deus agora? (s/N — 15s, Enter recusa)");
+  const resp = await askYesNo(15);
+  cfg.godModeAsked = true;
+  if (String(resp).startsWith("s")) {
+    salvarGodMode(true);
+    console.log("  → Modo Deus ATIVO (salvo em ponte.config.json).");
+    audit({ action: "god_mode", resumo: "ativado no boot pelo usuário" });
+  } else {
+    saveConfig(cfg);
+    console.log("  → Modo Deus ficou desativado. Posso perguntar de novo se você pedir.");
+  }
+}
+
 // ---------------------------------------------------------------- ações (whitelist fixa)
 const ACTIONS = {
   ping: async () => {
@@ -734,7 +903,9 @@ const ACTIONS = {
         ? "arquivos apenas (run_command desligado)"
         : cfg.auto
           ? "autônomo (run_command SEM confirmação · trava anticatástrofe ativa)"
-          : "supervisionado (run_command ATIVO)",
+          : cfg.godMode
+            ? "MODO DEUS (run_command SEM confirmação · trava anticatástrofe ativa)"
+            : "supervisionado (run_command ATIVO)",
       usuario: os.userInfo().username,
       maquina: os.hostname(),
       plataforma: os.platform() + " " + os.arch() + " · " + os.release(),
@@ -744,6 +915,8 @@ const ACTIONS = {
       ramTotalGB: +(os.totalmem() / 2 ** 30).toFixed(2),
       ramLivreGB: +(os.freemem() / 2 ** 30).toFixed(1),
       escopo: "somente " + cfg.home + " (pastas sensíveis bloqueadas)",
+      modoDeus: !!cfg.godMode,
+      skill: versaoSkillLocal() || "ainda não baixada",
     };
   },
 
@@ -1050,6 +1223,55 @@ const ACTIONS = {
     });
   },
 
+  god_mode: async (args) => {
+    const querLigar = args.enabled === true || args.enabled === "true";
+    const querDesligar = args.enabled === false || args.enabled === "false";
+    if (!querLigar && !querDesligar)
+      return {
+        godMode: !!cfg.godMode,
+        dica: 'use {"enabled": true} para pedir ativação ou {"enabled": false} para desligar',
+      };
+    if (querDesligar) {
+      salvarGodMode(false);
+      audit({ action: "god_mode", resumo: "desativado pela IA" });
+      log("Modo Deus DESATIVADO — run_command volta ao modo anterior.");
+      return {
+        godMode: false,
+        mensagem: "Modo Deus desativado (tornar mais seguro nunca pede confirmação).",
+      };
+    }
+    // Ativação: decisão FÍSICA do usuário, no terminal dele. Sem TTY = recusa.
+    audit({ action: "god_mode", resumo: "IA solicitou ativação" });
+    if (!process.stdin.isTTY)
+      throw new Error(
+        "Ativar o modo Deus exige confirmação FÍSICA no terminal do agente (ele está sem TTY). Peça ao usuário religar o agente no terminal e reenvie o pedido."
+      );
+    console.log("");
+    console.log("╔═══════════════════════════════════════════════════════╗");
+    console.log("║  A IA SOLICITOU ATIVAR O MODO DEUS                    ║");
+    console.log("║  Comandos rodarão SEM confirmação s/N.                ║");
+    console.log("║  Trava anticatástrofe, lixeira e log continuam.       ║");
+    console.log("╚═══════════════════════════════════════════════════════╝");
+    console.log("  Confirma a ativação? (s/N — 30s, Enter recusa)");
+    const resp = await askYesNo(30);
+    if (!String(resp).startsWith("s")) {
+      audit({ action: "god_mode", resumo: "usuário RECUSOU a ativação" });
+      return { godMode: false, mensagem: "Usuário recusou a ativação no terminal." };
+    }
+    salvarGodMode(true);
+    audit({ action: "god_mode", resumo: "ATIVADO com confirmação física do usuário" });
+    log("Modo Deus ATIVO — run_command roda sem confirmação.");
+    return { godMode: true, mensagem: "Modo Deus ativado com confirmação física do usuário." };
+  },
+
+  skill_update: async () => {
+    const r = await atualizarSkill("comando");
+    r.versaoLocal = versaoSkillLocal();
+    r.arquivo = SKILL_FILE;
+    r.rotina = "boot + a cada 6h (automático)";
+    return r;
+  },
+
   tree: async (args) => {
     const rp = assertAllowed(args.path || cfg.home);
     const maxDepth = Math.min(4, Number(args.depth) || 2);
@@ -1261,8 +1483,8 @@ const ACTIONS = {
     const cwd = args.cwd ? path.resolve(String(args.cwd)) : cfg.home;
     const timeoutMin = Math.min(30, Number(args.timeoutMin) || 3);
 
-    // ---- modo autônomo: executa direto, exceto padrões catastróficos
-    if (cfg.auto) {
+    // ---- modo autônomo/modo deus: executa direto, exceto padrões catastróficos
+    if (cfg.auto || cfg.godMode) {
       const perigo = dangerCheck(cmdline);
       if (perigo) {
         audit({ action: "run_command", resumo: "AUTO-BLOQUEADO (" + perigo + "): " + cmdline.slice(0, 200) });
@@ -1273,9 +1495,17 @@ const ACTIONS = {
         );
       }
       console.log("");
-      console.log("  [AUTO] $ " + cmdline.replace(/\s*\n\s*/g, " && "));
+      console.log(
+        "  [" + (cfg.auto ? "AUTO" : "DEUS") + "] $ " + cmdline.replace(/\s*\n\s*/g, " && ")
+      );
       const out = await executarComando(cmdline, cwd, timeoutMin);
-      audit({ action: "run_command", modo: "auto", resumo: cmdline.slice(0, 200), exitCode: out.code, ms: out.ms });
+      audit({
+        action: "run_command",
+        modo: cfg.auto ? "auto" : "deus",
+        resumo: cmdline.slice(0, 200),
+        exitCode: out.code,
+        ms: out.ms,
+      });
       return {
         comando: cmdline,
         cwd,
@@ -1368,13 +1598,19 @@ async function main() {
         ? "arquivos apenas"
         : cfg.auto
           ? "autônomo (run_command sem confirmação)"
-          : "supervisionado (s/N)")
+          : cfg.godMode
+            ? "MODO DEUS (run_command sem confirmação)"
+            : "supervisionado (s/N)")
   );
   console.log("  Escopo   : somente " + cfg.home);
   console.log("  Proteções: pastas sensíveis bloqueadas · exclusões vão para");
   console.log(
     "             a lixeira · " +
-      (cfg.run ? (cfg.auto ? "trava anticatástrofe" : "run_command com s/N") : "sem shell/execução")
+      (cfg.run
+        ? cfg.auto || cfg.godMode
+          ? "trava anticatástrofe"
+          : "run_command com s/N"
+        : "sem shell/execução")
   );
   console.log("──────────────────────────────────────────────");
 
@@ -1382,6 +1618,9 @@ async function main() {
     console.log("\nPonte encerrada. Até já!");
     process.exit(0);
   });
+
+  await perguntaModoDeusNoBoot(); // 1x, só com terminal interativo
+  skillAutoUpdateLoop();          // baixa a SKILL.md agora e a cada 6h
 
   while (true) {
     try {

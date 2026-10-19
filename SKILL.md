@@ -433,7 +433,10 @@ A IA que opera DENTRO do PC do usuário deve preferir esse arquivo local —
 é sempre a versão vigente. A versão da skill vai no marcador
 `<!-- skill-version: X.Y.Z -->` no topo do arquivo. Verifique/force com
 `{"action":"skill_update","args":{}}` (devolve `atualizou`, `de`, `para`,
-`versaoLocal`); o `ping` também traz `skill` e `modoDeus`.
+`versaoLocal`); o `ping` também traz `skill` e `modoDeus`. Detalhe de
+operador: logo após um commit novo, o cache do raw.githubusercontent pode
+levar ~5 min para expirar — o `skill_update` devolve erro elegante ("sem
+marcador") e basta tentar de novo minutos depois.
 
 ## Sudo sem expor senha (padrão seguro) — Linux, só com autorização explícita
 

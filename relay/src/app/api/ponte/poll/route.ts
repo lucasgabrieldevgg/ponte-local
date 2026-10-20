@@ -3,30 +3,36 @@
 // Semântica HERDADA do original: primeiro poll SEM cursor → fresh=true e o
 // backlog antigo é PULADO (nada de sessão passada executa de surpresa);
 // claim com lease de 120 s (app morto → comando volta pra fila).
+// t42: o canal mora no backend escolhido (memória | Firebase RTDB) — a
+// reciclagem da instância serverless NÃO expira mais o pareamento.
 import { NextRequest } from 'next/server';
-import { canalPorAgente, markSeen, maxCommandId, pollCommands, PONTE_VERSION } from '@/lib/ponte-store';
+import { getBackend } from '@/lib/backend';
+import { PONTE_VERSION } from '@/lib/ponte-store';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   const token = req.headers.get('x-ponte-token');
-  const canal = canalPorAgente(token);
-  if (canal === null) {
+  const url = new URL(req.url);
+  const temCursor = url.searchParams.has('cursor');
+
+  const backend = await getBackend();
+  const cursor = temCursor
+    ? Math.max(0, parseInt(url.searchParams.get('cursor') ?? '0', 10) || 0)
+    : null;
+  const r = await backend.poll(token, cursor);
+  if (r.ok !== true) {
     return Response.json(
       { ok: false, error: 'token de agente inválido ou pareamento expirado' },
       { status: 401 },
     );
   }
-  markSeen(canal);
-  const url = new URL(req.url);
-
-  // primeiro poll: pula o histórico (fresh, molde original)
-  if (!url.searchParams.has('cursor')) {
+  if (r.fresh) {
     return Response.json(
       {
         ok: true,
         commands: [],
-        nextCursor: maxCommandId(canal),
+        nextCursor: r.nextCursor,
         fresh: true,
         pollMs: 1500,
         version: PONTE_VERSION,
@@ -34,11 +40,8 @@ export async function GET(req: NextRequest) {
       { headers: { 'cache-control': 'no-store' } },
     );
   }
-
-  const cursor = Math.max(0, parseInt(url.searchParams.get('cursor') ?? '0', 10) || 0);
-  const { commands, nextCursor } = pollCommands(canal, cursor);
   return Response.json(
-    { ok: true, commands, nextCursor, pollMs: 1500, version: PONTE_VERSION },
+    { ok: true, commands: r.commands, nextCursor: r.nextCursor, pollMs: 1500, version: PONTE_VERSION },
     { headers: { 'cache-control': 'no-store' } },
   );
 }

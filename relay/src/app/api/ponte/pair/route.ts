@@ -3,8 +3,9 @@
 // bloco colável. Reusar qualquer dos tokens num par novo revoga o canal
 // anterior na hora. ADAPTAÇÃO GalaxyCut — no original os tokens eram env
 // vars fixas; aqui são canais dinâmicos com TTL e limites.
+// t42: o estado mora no backend escolhido (memória | Firebase RTDB).
 import { NextRequest } from 'next/server';
-import { registerPair } from '@/lib/ponte-store';
+import { getBackend } from '@/lib/backend';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +16,8 @@ export async function POST(req: NextRequest) {
   } catch {
     return Response.json({ ok: false, error: 'JSON inválido' }, { status: 400 });
   }
-  const r = registerPair(body.agentToken, body.operatorToken);
+  const backend = await getBackend();
+  const r = await backend.registerPair(body.agentToken, body.operatorToken);
   if (r.ok !== true) {
     return Response.json({ ok: false, error: r.error }, { status: 400 });
   }

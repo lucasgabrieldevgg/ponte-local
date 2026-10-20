@@ -12,24 +12,18 @@
 // (spec t30 §7 da casa). Um canal novo com o mesmo token REVOGA o anterior
 // na hora; canal sem poll por 6 h expira sozinho.
 //
+// t42: este módulo é a implementação MEMÓRIA da interface PonteBackend
+// (src/lib/backend.ts) — a bateria do verify-relay roda idêntica nela e na
+// implementação Firebase. As funções abaixo continuam sendo a fonte da
+// verdade do desenho original; o wrapper createMemoryBackend() só adapta
+// a assinatura ao contrato.
+//
 // Privacidade (herdada do original): nada de arquivos trafega aqui — apenas
 // JSON de metadados/operações do editor.
 
-export interface PonteCommand {
-  id: number;
-  action: string;
-  args?: Record<string, unknown>;
-  ts: number;
-}
+import type { PonteBackend, PonteCommand, PonteResult } from './backend';
 
-export interface PonteResult {
-  id: number;
-  ok: boolean;
-  data?: unknown;
-  error?: string;
-  durationMs?: number;
-  ts: number;
-}
+export type { PonteCommand, PonteResult } from './backend';
 
 interface Canal {
   agentToken: string;
@@ -57,7 +51,7 @@ interface Estado {
 
 const g = globalThis as unknown as { __ponteGalaxycutRelay?: Estado };
 
-export const PONTE_VERSION = "2.0.0-galaxycut";
+export const PONTE_VERSION = "2.1.0-galaxycut";
 export const CONNECTED_WINDOW_MS = 15_000;
 
 /** Lease do claim: se o app não responder em 2 min, o comando volta pra fila. */
@@ -232,5 +226,67 @@ export function stats() {
     canaisAtivos: s.canaisAgente.size,
     totalPareamentos: s.totalPairs,
     uptimeS: Math.round((Date.now() - s.startedAt) / 1000),
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* t42 — adaptador da interface PonteBackend (contrato de backend.ts).   */
+/* As funções acima continuam sendo a fonte da verdade do desenho        */
+/* original; nada de lógica nova aqui, só tradução de assinatura.        */
+/* ------------------------------------------------------------------ */
+
+export function createMemoryBackend(): PonteBackend {
+  return {
+    async registerPair(agentToken, operatorToken) {
+      const r = registerPair(agentToken, operatorToken);
+      return r.ok === true ? { ok: true } : { ok: false, status: 400, error: r.error };
+    },
+
+    async poll(agentToken, cursor) {
+      const canal = canalPorAgente(agentToken);
+      if (canal === null) return { ok: false, status: 401 };
+      markSeen(canal);
+      if (cursor === null) {
+        return { ok: true, commands: [], nextCursor: maxCommandId(canal), fresh: true };
+      }
+      const { commands, nextCursor } = pollCommands(canal, cursor);
+      return { ok: true, commands, nextCursor, fresh: false };
+    },
+
+    async addResult(agentToken, result) {
+      const canal = canalPorAgente(agentToken);
+      if (canal === null) return { ok: false, status: 401 };
+      pushResult(canal, { ...result, ts: Date.now() });
+      return { ok: true };
+    },
+
+    async addCommand(operatorToken, action, args) {
+      const canal = canalPorOperador(operatorToken);
+      if (canal === null) return { ok: false, status: 401 };
+      try {
+        const cmd = addCommand(canal, action, args);
+        return { ok: true, id: cmd.id };
+      } catch (e) {
+        return { ok: false, status: 429, error: e instanceof Error ? e.message : 'Erro ao enfileirar' };
+      }
+    },
+
+    async resultsSince(operatorToken, since) {
+      const canal = canalPorOperador(operatorToken);
+      if (canal === null) return { ok: false, status: 401 };
+      const results = resultsSince(canal, since);
+      const lastId = results.length ? results[results.length - 1].id : since;
+      return { ok: true, results, lastId };
+    },
+
+    async stats() {
+      const s = stats();
+      return {
+        ok: true as const,
+        canaisAtivos: s.canaisAtivos,
+        totalPareamentos: s.totalPareamentos,
+        uptimeS: s.uptimeS,
+      };
+    },
   };
 }

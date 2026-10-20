@@ -1,15 +1,17 @@
 {
   "name": "ponte-relay-galaxycut",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
-  "description": "Relay do Modo Ponte do GalaxyCut-AI — fork adaptado do ponte-local (MIT, MicaelSanPedro)",
+  "description": "Relay do Modo Ponte do GalaxyCut-AI — fork adaptado do ponte-local (MIT, MicaelSanPedro). t42: backend pluggável (memória | Firebase RTDB)",
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3000",
-    "verify": "node scripts/verify-relay.mjs"
+    "verify": "node scripts/verify-relay.mjs",
+    "verify:firebase": "node scripts/verify-firebase.mjs"
   },
   "dependencies": {
+    "firebase-admin": "^14.5.0",
     "next": "^16.4.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"

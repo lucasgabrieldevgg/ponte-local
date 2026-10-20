@@ -32,11 +32,31 @@ const ROOT = path.resolve(import.meta.dirname, '..');
 export const hex = (n) => Array.from({ length: n }, () => Math.floor(Math.random() * 16).toString(16)).join('');
 export const token = () => `gcpt_${hex(36)}`;
 
+// spawn DIRETO do binário (sem wrapper npx) em GRUPO próprio: o kill do grupo
+// derruba o next E o next-server filho — matar só o wrapper deixa órfão
+// segurando o lock de .next/dev, e o PRÓXIMO dev server trava no lock
+// (bug real: verify:firebase não subia depois do verify de memória).
+const nextBin = () => path.join(ROOT, 'node_modules', 'next', 'dist', 'bin', 'next');
+
+/** Mata o grupo INTEIRO do servidor (TERM, espera, KILL de garantia). */
+export async function descerServidor(proc) {
+  if (proc.exitCode === null) {
+    try { process.kill(-proc.pid, 'SIGTERM'); } catch {}
+    try { proc.kill('SIGTERM'); } catch {}
+    await new Promise((r) => setTimeout(r, 1500));
+    if (proc.exitCode === null) {
+      try { process.kill(-proc.pid, 'SIGKILL'); } catch {}
+      try { proc.kill('SIGKILL'); } catch {}
+      await new Promise((r) => setTimeout(r, 300));
+    }
+  }
+}
+
 export async function subirServidor(port, envExtra = {}) {
-  const proc = spawn('npx', ['next', 'dev', '-p', String(port)], {
+  const proc = spawn(process.execPath, [nextBin(), 'dev', '-p', String(port)], {
     cwd: ROOT,
     stdio: 'ignore',
-    detached: false,
+    detached: true, // grupo próprio (pgid = pid) p/ kill de grupo no descer
     env: { ...process.env, ...envExtra },
   });
   const base = `http://127.0.0.1:${port}`;
@@ -46,15 +66,13 @@ export async function subirServidor(port, envExtra = {}) {
       const r = await fetch(`${base}/api/ponte/status`);
       if (r.status === 200) return { proc, base };
     } catch {}
-    if (Date.now() - t0 > 120_000) throw new Error(`relay não subiu em 120 s (porta ${port})`);
+    if (Date.now() - t0 > 120_000) {
+      // timeout NUNCA deixa órfão: grupo morto antes do throw
+      try { process.kill(-proc.pid, 'SIGKILL'); } catch {}
+      try { proc.kill('SIGKILL'); } catch {}
+      throw new Error(`relay não subiu em 120 s (porta ${port})`);
+    }
     await new Promise((r) => setTimeout(r, 500));
-  }
-}
-
-export async function descerServidor(proc) {
-  if (proc.exitCode === null) {
-    proc.kill('SIGTERM');
-    await new Promise((r) => setTimeout(r, 800));
   }
 }
 

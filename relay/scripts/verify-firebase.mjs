@@ -11,6 +11,8 @@
 //           restart continua VIVO, recebe comandos novos e devolve
 //           resultados — porque o estado mora no RTDB, não na memória.
 //           (no backend memória este cenário expira o canal: 401)
+//   R14     regras LOCKED: leitura E escrita ANÔNIMAS no banco são NEGADAS
+//           (o Admin SDK ignora regras; cliente público nenhum toca o RTDB)
 //
 // Credenciais (uma das duas):
 //   FIREBASE_SERVICE_ACCOUNT  = JSON completo da service account (inline)
@@ -60,10 +62,12 @@ const ok = (cond, label) => {
 
 async function cleanupRtdb() {
   // remove o root de teste usando o firebase-admin DIRETO (sem servidor)
-  const { getApp, initializeApp } = await import('firebase-admin/app');
+  // (cert vem de firebase-admin/app — 'firebase-admin/credential' não é
+  // subpath exportável e o import estoura no firebase-admin v14)
+  const { initializeApp, cert } = await import('firebase-admin/app');
   const { getDatabase } = await import('firebase-admin/database');
   const sa = JSON.parse(SA_JSON);
-  const app = initializeApp({ credential: await import('firebase-admin/credential').then((c) => c.cert(sa)), databaseURL: DB_URL }, `cleanup-${Date.now()}`);
+  const app = initializeApp({ credential: cert(sa), databaseURL: DB_URL }, `cleanup-${Date.now()}`);
   try {
     await getDatabase(app).ref(ROOT_TESTE).remove();
     console.log(`[verify-firebase] root de teste '${ROOT_TESTE}' removido do RTDB.`);
@@ -86,6 +90,16 @@ try {
     const rFresh = await fetch(`${srv.base}/api/ponte/poll`, { headers: { 'x-ponte-token': agentNovo } });
     const bFresh = await rFresh.json();
     const cursorAteAqui = bFresh.nextCursor ?? 0;
+
+    // --- R14: regras LOCKED — banco recusa leitura E escrita anônimas ---
+    let rAnon = await fetch(`${DB_URL}/${ROOT_TESTE}/.json`);
+    ok(rAnon.status === 401, 'R14a regras LOCKED: leitura ANÔNIMA do banco é NEGADA (401)');
+    rAnon = await fetch(`${DB_URL}/${ROOT_TESTE}/probe-anonima.json`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: '{"x":1}',
+    });
+    ok(rAnon.status === 401, 'R14b regras LOCKED: escrita ANÔNIMA do banco é NEGADA (401)');
 
     console.log(`\n[verify-firebase] RESTART do servidor (o equivalente local de a instância reciclar)…`);
     await descerServidor(srv.proc);

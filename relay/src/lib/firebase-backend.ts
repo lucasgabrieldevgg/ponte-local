@@ -277,8 +277,15 @@ export function createFirebaseBackend(rootEnv?: string): PonteBackend {
       const { agentToken: ag } = achado;
       const base = ref('');
       const key = pad(result.id);
+      // RTDB recusa `undefined` ("values argument contains undefined"): campos
+      // ausentes são OMITIDOS do valor, não espalhados — o resultado lido de
+      // volta nasce igual ao que o backend memória devolve.
+      const valor: Record<string, unknown> = { id: result.id, ok: result.ok, ts: nowMs() };
+      if (result.data !== undefined) valor.data = result.data;
+      if (result.error !== undefined) valor.error = result.error;
+      if (result.durationMs !== undefined) valor.durationMs = result.durationMs;
       const updates: Record<string, unknown> = {
-        [`results/${ag}/${key}`]: { ...result, ts: nowMs() },
+        [`results/${ag}/${key}`]: valor,
         [`cmds/${ag}/${key}/doneAt`]: nowMs(),
         [`canais/${ag}/totalResults`]: ServerValue.increment(1),
       };

@@ -1,0 +1,17 @@
+{
+  "name": "ponte-relay-galaxycut",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Relay do Modo Ponte do GalaxyCut-AI — fork adaptado do ponte-local (MIT, MicaelSanPedro)",
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "verify": "node scripts/verify-relay.mjs"
+  },
+  "dependencies": {
+    "next": "^16.4.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  }
+}

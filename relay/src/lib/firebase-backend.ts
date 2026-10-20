@@ -38,7 +38,7 @@
 //     a leitura e o update atômico (multi-path). Caso caseiro, raro, e a
 //     revogação ainda prevalece no próximo pareamento.
 import { getApp, getApps, initializeApp, cert, type App } from 'firebase-admin/app';
-import { getDatabase, ServerValue } from 'firebase-admin/database';
+import { getDatabase, ServerValue, type Database } from 'firebase-admin/database';
 import type {
   AddCommandOutcome,
   AddResultOutcome,
@@ -63,6 +63,17 @@ const TOKEN_RE = /^gcpt_[0-9a-f]{36}$/;
 
 const pad = (id: number): string => String(id).padStart(10, '0');
 const nowMs = (): number => Date.now();
+
+/**
+ * Caminho vazio = referência RAIZ do banco. Crítico: root '' é o DEFAULT de
+ * produção (o banco inteiro é do relay) e `db.ref('')` é caminho INVÁLIDO
+ * ("path argument was an invalid path = ''") — derrubou stats/registerPair
+ * na primeira subida em produção. Nunca chame db.ref(caminho) cru.
+ */
+const refOuRaiz = (db: Database, caminho: string) => {
+  const limpo = caminho.replace(/^\/+|\/+$/g, '');
+  return limpo === '' ? db.ref() : db.ref(limpo);
+};
 
 /* ------------------------------------------------------------------ */
 /* App Admin (singleton HMR-safe)                                        */
@@ -110,7 +121,7 @@ interface CanalRow {
 /** Remove canais mortos (6 h sem poll) e atualiza meta/canaisAtivos. */
 async function sweep(root: string): Promise<number> {
   const db = getDatabase(adminApp());
-  const base = db.ref(root);
+  const base = refOuRaiz(db, root);
   const metaSnap = await base.child('meta/lastSweep').get();
   const last = metaSnap.val() as number | null;
   const agora = nowMs();
@@ -147,7 +158,7 @@ export function createFirebaseBackend(rootEnv?: string): PonteBackend {
   const root = (rootEnv ?? process.env.PONTE_FIREBASE_ROOT ?? '').replace(/^\/+|\/+$/g, '');
   const startedAt = nowMs();
   const db = () => getDatabase(adminApp());
-  const ref = (p: string) => db().ref(`${root}/${p}`.replace(/^\/+/, ''));
+  const ref = (p: string) => refOuRaiz(db(), `${root}/${p}`);
 
   /** Canal por agentToken (null = 401). */
   async function canalDoAgente(token: string | null): Promise<{ agentToken: string; canal: CanalRow } | null> {

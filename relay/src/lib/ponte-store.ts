@@ -247,7 +247,13 @@ export function createMemoryBackend(): PonteBackend {
       if (canal === null) return { ok: false, status: 401 };
       markSeen(canal);
       if (cursor === null) {
-        return { ok: true, commands: [], nextCursor: maxCommandId(canal), fresh: true };
+        // [t44] freshSkipped: o fresh-skip CONFESSA quantos pendentes pulou
+        // (sem resultado ainda, id <= nextCursor = todo o backlog visível).
+        const maxId = maxCommandId(canal);
+        const skipped = canal.commands.filter(
+          (c) => c.id <= maxId && !canal.results.some((r) => r.id === c.id),
+        ).length;
+        return { ok: true, commands: [], nextCursor: maxId, fresh: true, skipped };
       }
       const { commands, nextCursor } = pollCommands(canal, cursor);
       return { ok: true, commands, nextCursor, fresh: false };

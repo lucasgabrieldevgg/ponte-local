@@ -115,8 +115,8 @@ export async function bateria(BASE, prefixo = '') {
   r = await fetch(`${BASE}/api/ponte/poll`, { headers: { 'x-ponte-token': AGENT } });
   b = await r.json();
   ok(
-    r.status === 200 && b.ok === true && b.fresh === true && b.commands.length === 0 && typeof b.nextCursor === 'number',
-    `${prefixo}R2 primeiro poll sem cursor → fresh=true, backlog PULADO (P13)`,
+    r.status === 200 && b.ok === true && b.fresh === true && b.commands.length === 0 && typeof b.nextCursor === 'number' && b.skipped === 0,
+    `${prefixo}R2 primeiro poll sem cursor → fresh=true, backlog PULADO (P13) e skipped=0 confessado [t44]`,
   );
 
   // --- R8: operatorToken recusado no poll ---
@@ -192,6 +192,14 @@ export async function bateria(BASE, prefixo = '') {
   const entregue2 = (b.commands ?? []).find((c) => c.id === id2) !== undefined;
   ok(entregue1 === true && entregue2 === false, `${prefixo}R12 lease de 120 s: comando em curso NÃO é reentregue (dedup do transporte)`);
 
+  // --- R12b [t44]: fresh-skip CONFESSA quantos pendentes pulou ---
+  r = await fetch(`${BASE}/api/ponte/poll`, { headers: { 'x-ponte-token': AGENT } });
+  b = await r.json();
+  ok(
+    r.status === 200 && b.fresh === true && typeof b.skipped === 'number' && b.skipped >= 1,
+    `${prefixo}R12b [t44] fresh-skip CONFESSA os pendentes pulados (skipped>=1 — id2 segue sem resultado)`,
+  );
+
   // --- R10: re-pareamento revoga o canal anterior ---
   const AGENT2 = token();
   r = await fetch(`${BASE}/api/ponte/pair`, {
@@ -205,7 +213,10 @@ export async function bateria(BASE, prefixo = '') {
   ok(r.status === 401, `${prefixo}R10b o agentToken ANTIGO morre na hora (canal substituído, P1)`);
   r = await fetch(`${BASE}/api/ponte/poll`, { headers: { 'x-ponte-token': AGENT2 } });
   b = await r.json();
-  ok(r.status === 200 && b.fresh === true, `${prefixo}R10c o agentToken NOVO polla normal (fresh de novo)`);
+  ok(
+    r.status === 200 && b.fresh === true && b.skipped === 0,
+    `${prefixo}R10c o agentToken NOVO polla normal (fresh de novo, canal limpo: skipped=0)`,
+  );
 
   return { pass, fail, agent: AGENT, operator: OPERATOR, agentNovo: AGENT2 };
 }

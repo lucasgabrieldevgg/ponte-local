@@ -43,8 +43,11 @@ export type RegisterPairOutcome =
   | { ok: false; status: 400; error: string };
 
 export type PollOutcome =
-  | { ok: true; commands: PonteCommand[]; nextCursor: number; fresh: boolean }
+  | { ok: true; commands: PonteCommand[]; nextCursor: number; fresh: boolean; skipped?: number }
   | { ok: false; status: 401 };
+// [t44] skipped (só no fresh): quantos comandos PENDENTES o fresh-skip
+// pulou — o relay confessa o backlog descartado em vez de silenciar
+// (achado do A3 na revisão t40; cosmético, o cursor já protege).
 
 export type AddResultOutcome =
   | { ok: true }

@@ -245,7 +245,10 @@ export function createFirebaseBackend(rootEnv?: string): PonteBackend {
           const row = Object.values(last.val() as Record<string, { id?: unknown }>)[0];
           if (typeof row?.id === 'number') maxId = row.id;
         }
-        return { ok: true, commands: [], nextCursor: maxId, fresh: true };
+        // [t44] freshSkipped: o pendingCount do canal (mantido transacional
+        // em addCommand/addResult) é exatamente o backlog pendente pulado.
+        const skipped = Math.max(0, achado.canal.pendingCount ?? 0);
+        return { ok: true, commands: [], nextCursor: maxId, fresh: true, skipped };
       }
 
       const snap = await base

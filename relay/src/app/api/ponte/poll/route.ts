@@ -34,6 +34,9 @@ export async function GET(req: NextRequest) {
         commands: [],
         nextCursor: r.nextCursor,
         fresh: true,
+        // [t44] quantos pendentes o fresh-skip pulou (0 quando o canal nasce
+        // limpo) — transparência para o app/IA reenviar o que importa.
+        skipped: r.skipped ?? 0,
         pollMs: 1500,
         version: PONTE_VERSION,
       },

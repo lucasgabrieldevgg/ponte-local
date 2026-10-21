@@ -109,7 +109,8 @@ USUÁRIO a religar no app, e é ele quem decide.
   novo bloco) — pare e avise.
 - Comandos que sumiram no religamento do app: o primeiro poll é
   `fresh=true` e o backlog antigo é DESCARTADO de propósito (não se
-  executa lixo de sessão passada) — reenvie o que ainda importa.
+  executa lixo de sessão passada) — o campo `skipped` da resposta diz
+  quantos pendentes foram pulados; reenvie o que ainda importa.
 - Relay fora: results vazio e status mostra desconectado — o editor do
   usuário segue 100% funcional, só a ponte espera.
 

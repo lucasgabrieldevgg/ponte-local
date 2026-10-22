@@ -15,15 +15,23 @@
 //   R10 re-pareamento revoga o canal anterior NA HORA (P1)
 //   R11 /status público sem segredos (sem tokens, sem ações)
 //   R12 lease: comando não respondido volta pra fila após o lease
+//   R15 [t49] GET /skill/galaxycut.md → 200 · text/markdown · corpo byte a
+//        byte = SKILL.md raiz do fork (rota de módulo gerado, zero fs)
 //
 // Uso: npm run verify   (sobe o dev server sozinho na porta 3199 e mata no fim)
 //
 // t42: a BATERIA é a mesma para os dois backends — verify-firebase.mjs
 // importa subirServidor/bateria/descerServidor daqui e roda o mesmo
-// contrato contra PONTE_BACKEND=firebase (+ R13, persistência pós-restart).
-// Contrato é contrato: se uma implementação divergir, o verify aponta.
+// contrato contra PONTE_BACKEND=firebase (+ R13/R14 de persistência e
+// regras locked, exclusivas do firebase). Contrato é contrato: se uma
+// implementação divergir, o verify aponta.
+//
+// t49/renumeração honesta: a TAREFA propôs "R13" para a rota da skill sem
+// notar que a bateria firebase JÁ usava R13/R14 (t42) — a rota entra como
+// R15, registrada aqui e no FEITO.
 
 import { spawn } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
 
 const PORT = 3199;
@@ -216,6 +224,23 @@ export async function bateria(BASE, prefixo = '') {
   ok(
     r.status === 200 && b.fresh === true && b.skipped === 0,
     `${prefixo}R10c o agentToken NOVO polla normal (fresh de novo, canal limpo: skipped=0)`,
+  );
+
+  // --- R15 [t49]: rota da skill — o manual que o bloco promete ---
+  // O bloco de pareamento manda a IA ler {relay}/skill/galaxycut.md: a URL
+  // precisa existir (era 404 por construção), vir como text/markdown com
+  // charset utf-8 EXPLÍCITO e entregar o SKILL.md raiz BYTE A BYTE (a prova
+  // lê o fs do REPO — o runtime nunca lê fs, o conteúdo vive no módulo
+  // gerado src/lib/galaxycut-skill.ts, regenerado por npm run gen:skill).
+  r = await fetch(`${BASE}/skill/galaxycut.md`);
+  const skillRaw = await r.text();
+  const skillMd = fs.readFileSync(path.join(ROOT, '..', 'SKILL.md'), 'utf8');
+  ok(
+    r.status === 200 &&
+      (r.headers.get('content-type') || '').toLowerCase().startsWith('text/markdown;') === true &&
+      (r.headers.get('content-type') || '').includes('charset=utf-8') &&
+      skillRaw === skillMd,
+    `${prefixo}R15 [t49] GET /skill/galaxycut.md → 200 · text/markdown; charset=utf-8 · corpo BYTE A BYTE = SKILL.md raiz`,
   );
 
   return { pass, fail, agent: AGENT, operator: OPERATOR, agentNovo: AGENT2 };

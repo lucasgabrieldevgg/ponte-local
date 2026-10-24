@@ -49,12 +49,20 @@ tempo real).
   b-roll, overlay, inspect_frame)
 - Áudio: `audio_*` (ducking, normalize, stems, beat match, bg music, sfx)
 - Legendas: `subtitle_*` (word-sync, preset, highlight, emojis)
-- Animação em código: `code_*` — 10 templates cinematográficos reais:
-  cinematic_title (letterbox + tracking dourado), word_pop (cinética palavra
-  a palavra), zoom_punch (impacto com speed-lines), badge_stamp (selo
-  carimbado com shine), particle_burst (partículas + glow), lower_third
-  (barra de broadcast), counter_badge (contador com anel de progresso),
-  glitch_pop, spring_scale, neon_pulse
+- Animação em código: `code_*` — 16 templates com física de verdade
+  (spring/damped paramétrica): cinematic_title (letterbox + tracking
+  dourado), word_pop (cinética palavra a palavra), zoom_punch (impacto com
+  speed-lines), badge_stamp (selo carimbado com shine), particle_burst
+  (partículas + glow), lower_third (barra de broadcast), counter_badge
+  (contador com anel de progresso), glitch_pop, spring_scale, neon_pulse,
+  impact_frame (golpes ritmados com hold-frames), chromatic_glitch
+  (aberração RGB + scanlines), comic_wipe (painéis de quadrinho + halftone),
+  kinetic_mask (revelação por máscara, palavra a palavra), counter_rich
+  (contador com easing escolhível + prefixo/sufixo), logo_stinger (bumper de
+  abertura). Parâmetros de física — intensity (0.25 suave a 2 agressivo),
+  easing (expo/back/spring/elastic/cubic), direction (left/right/up/down) —
+  vão em `code_inject_to_timeline_track` e em `timeline_update_clip`
+  (motion_intensity/motion_easing/motion_direction)
 - Estilo: `style_*` (DNA) · Marketing: `marketing_*` (thumbnail, metadata)
 - Memória da sessão: `memory_*` (read/write worklog, snapshots)
 - Mídia: `media_*` (import de pasta local, download de URL, busca de stock)
@@ -110,6 +118,13 @@ editor, não o computador.
    `timeline_get_clips` (kind=caption traz o texto de cada caixinha + id),
    corrija texto/tempo/posição com `timeline_update_clip` — não regenere
    tudo quando bastar ajustar um clipe.
+9. **Motion graphics: pergunte o ESTILO antes.** Se o usuário pedir
+   motion graphic/título animado sem especificar, proponha 3-4 templates do
+   catálogo com uma linha do que cada um faz (em Shorts, os de impacto —
+   zoom_punch, impact_frame, kinetic_mask — rendem mais; para estatística,
+   counter_rich; para abertura, logo_stinger). Se pedir "mais agressivo" ou
+   "mais suave", ajuste motion_intensity (0.25 a 2) e o easing em vez de
+   trocar de template às cegas — o usuário vê o resultado na preview.
 
 ## Modos físicos (só o usuário troca — no app)
 

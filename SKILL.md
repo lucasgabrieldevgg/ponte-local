@@ -77,6 +77,30 @@ A lista é derivada do registry do app e ACOMPANHA ele sozinha: a contagem
 exata está no `ponte_ping` e a recusa ensina o nome correto. Argumentos
 obrigatórios vêm do próprio schema — a recusa diz quais faltam.
 
+## Os olhos — capture e VEJA o frame (`timeline_capture_frame`)
+
+Você EDITA VENDO, não no escuro. O relatório `timeline_audit_visual`
+traz `capture_address` em cada achado (ex: `clip_3@12.34`) — passe-o
+INTEIRO em `timeline_capture_frame` e o resultado chega com o frame do
+momento sinalizado em `bulk.image_base64` (JPEG ≤640px, ≤64KB — decodado
+do FONTE no disco, pronto pra você OLHAR). O loop é REGRA de trabalho,
+não sugestão:
+
+```
+timeline_audit_visual  →  para cada achado: timeline_capture_frame
+(o capture_address dele)  →  VEJA o frame  →  corrija com as tools de
+edição  →  timeline_audit_visual de novo (re-audit)
+```
+
+O que você vê é o frame do VÍDEO FONTE naquele segundo — o fundo onde a
+legenda/overlay senta (contraste, espaço, movimento). A composição
+renderizada segue descrita pelo relatório: posições, contraste e timing
+foram medidos pelos checks. Achado de legenda/código resolve sozinho pro
+vídeo ATIVO sob ele. Tetos honestos: 8 decodes por janela de 180s (cache
+não conta — mesma fonte+tempo = mesmo frame, reutilize), largura máx.
+640px; a recusa do teto ensina a priorizar (achados severity=erro
+primeiro).
+
 ## Fronteira PERMANENTE — não existe, não tente
 
 Não existe `system_run_command`, não existe ação de arquivo (`list`,

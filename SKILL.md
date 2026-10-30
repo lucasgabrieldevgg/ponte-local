@@ -49,7 +49,7 @@ tempo real).
   b-roll, overlay, inspect_frame)
 - Áudio: `audio_*` (ducking, normalize, stems, beat match, bg music, sfx)
 - Legendas: `subtitle_*` (word-sync, preset, highlight, emojis)
-- Animação em código: `code_*` — 16 templates com física de verdade
+- Animação em código: `code_*` — 23 templates com física de verdade
   (spring/damped paramétrica): cinematic_title (letterbox + tracking
   dourado), word_pop (cinética palavra a palavra), zoom_punch (impacto com
   speed-lines), badge_stamp (selo carimbado com shine), particle_burst
@@ -59,7 +59,15 @@ tempo real).
   (aberração RGB + scanlines), comic_wipe (painéis de quadrinho + halftone),
   kinetic_mask (revelação por máscara, palavra a palavra), counter_rich
   (contador com easing escolhível + prefixo/sufixo), logo_stinger (bumper de
-  abertura). Parâmetros de física — intensity (0.25 suave a 2 agressivo),
+  abertura). Pacote cinema r16 (coreografia adaptada do HyperFrames
+  Apache-2 — ver NOTICE.md): cinema_lower (lower-third dark glass com filete
+  dourado e shine), comment_card (comentário com avatar e likes — countTo é
+  o número), follow_cta (botão FOLLOW→FOLLOWING com elastic — countTo é
+  seguidores), music_card (card de música com vinil e progresso), post_card
+  (print de post com selo verificado — headline é o texto, subline é o
+  @handle), anamorphic_flare (streaks azuis com bloom aditivo — o look
+  cinema), liquid_glass (cápsula frost iOS com specular vagueando).
+  Parâmetros de física — intensity (0.25 suave a 2 agressivo),
   easing (expo/back/spring/elastic/cubic), direction (left/right/up/down) —
   vão em `code_inject_to_timeline_track` e em `timeline_update_clip`
   (motion_intensity/motion_easing/motion_direction)

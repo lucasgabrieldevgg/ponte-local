@@ -44,7 +44,10 @@ tempo real).
   REAL: texto das legendas/transcrição, posição, estilo, template) e
   `timeline_update_clip` (edita UM clipe por id: corrige texto de legenda,
   move no tempo, reposiciona na preview com position top/center/bottom,
-  muda estilo/template — edição individual, clipe a clipe)
+  muda estilo/template e ajusta o VOLUME de áudio do clipe (param volume
+  0.05..2.0 — 1 = unitário, 0.7 ≈ −3 dB; escreve no volume REAL: a prévia
+  e o export leem o mesmo campo. Renomeie clipes de música pra `music_*`
+  pra as tools de voz os pouparem) — edição individual, clipe a clipe)
 - Visual: `visual_*` (color grading, punch-in, smart blur, auto reframe,
   b-roll, overlay, inspect_frame)
 - Áudio: `audio_*` (ducking, normalize, enhance — `audio_enhance_voice` é o

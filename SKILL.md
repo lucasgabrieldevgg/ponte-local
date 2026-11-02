@@ -61,7 +61,13 @@ tempo real).
   `volume` (0.05..2.0) e `name` na MESMA chamada). Cada elemento nasce
   no lugar certo em UM passo — SEM o update_clip extra pra posicionar (a
   skill de estilo do usuário manda nas CONSTANTES do formato; o contrato
-  manda na régua). A cama de música já pode nascer renomeada music_* com
+  manda na régua). TIMING (medido): `start_s` é honrado só com a faixa
+  LIVRE no ponto; ocupada, o clipe cai no vão livre mais próximo (nunca
+  empilha) e imagem nasce com 4,8s — corrija o tempo com
+  `timeline_update_clip` (start_sec/duration_sec), que move pra dentro da
+  faixa ocupada e ajeita os vizinhos. RENDER (medido): fit-width —
+  W = zoom% × 1080 e H = W/aspecto; imagem vertical a zoom 100 transborda
+  a zona: calcule o zoom pelo aspecto. A cama de música já pode nascer renomeada music_* com
   volume 0.7 (≈ −3 dB). Faixas extras: `timeline_add_track` (V3/A3/T2…)
   antes de montar nelas
 - Visual: `visual_*` (color grading, punch-in, smart blur, auto reframe,
@@ -74,11 +80,17 @@ tempo real).
   (highpass → compressor → limitador → +20% de ganho) e o campo que escreve
   é o MESMO que a prévia e o export leem · stems, beat match, bg music, sfx)
 - Legendas: `subtitle_*` (word-sync, preset, highlight, emojis).
-  `subtitle_apply_preset` aceita `custom_style_rules` — overrides de QUALQUER
-  chave de estilo por cima do preset (font, color, strokeColor, strokeW,
-  shadow, highlight, highlightColor, highlightAnim, typewriter, uppercase,
-  size, bg…) — e `position` como fração do TOPO do frame (ex.: '0.5' = faixa
-  no meio do frame)
+  `subtitle_generate_word_sync` (medido): passe `target: 'clip_id'` +
+  `clip_id` do clipe de VOZ pra transcrever SÓ ele (~2 min, completa no
+  turno de 150s e o `data.segments` chega inteiro no resultado); SEM
+  target ele transcreve o MIX da timeline inteira (lento — estoura o teto
+  e os segments ficam PRESOS no resumo tardio, inutilizados).
+  `subtitle_apply_preset` COM `segments` [{text,start,end}] CRIA os clipes
+  de legenda (o preset + `custom_style_rules` — overrides de QUALQUER
+  chave: font, color, strokeColor, strokeW, shadow, highlight,
+  highlightColor, highlightAnim, typewriter, uppercase, size, bg… — e
+  `position` como fração do TOPO do frame, ex. '0.43' = strip universal);
+  SEM segments ele só RESTILA as legendas que já existem na T1.
 - Animação em código: `code_*` — 23 templates com física de verdade
   (spring/damped paramétrica): cinematic_title (letterbox + tracking
   dourado), word_pop (cinética palavra a palavra), zoom_punch (impacto com

@@ -41,15 +41,33 @@ tempo real).
 - Edição de timeline: `timeline_*` (split, reorder, remove_silences,
   remove_fillers, pacing curve, speed ramping)
 - Leitura & edição fina de clipes: `timeline_get_clips` (lê o conteúdo
-  REAL: texto das legendas/transcrição, posição, estilo, template) e
-  `timeline_update_clip` (edita UM clipe por id: corrige texto de legenda,
-  move no tempo, reposiciona na preview com position top/center/bottom,
-  muda estilo/template e ajusta o VOLUME de áudio do clipe (param volume
+  REAL: texto das legendas/transcrição, estilo, template — e a POSIÇÃO de
+  TODO clipe {x, y, frac_top, locked} + volume: mídia, personagem e motion
+  inclusos, não só legenda. frac_top é a MESMA fração do TOPO que o param
+  position escreve — você lê na régua que escreve) e `timeline_update_clip`
+  (edita UM clipe por id: corrige texto de legenda, move no tempo,
+  reposiciona na preview com position top/center/bottom (bottom = 0.81 do
+  topo — bottom-anchored) ou fração 0.02–0.98 do TOPO ('0.43' = strip
+  universal de legenda), move de faixa com track, muda estilo/template e
+  ajusta o VOLUME de áudio do clipe (param volume
   0.05..2.0 — 1 = unitário, 0.7 ≈ −3 dB; escreve no volume REAL: a prévia
   e o export leem o mesmo campo. Renomeie clipes de música pra `music_*`
   pra as tools de voz os pouparem) — edição individual, clipe a clipe)
+- MONTAGEM — o clipe NASCE POSICIONADO (v1.7.6): `timeline_add_clip`
+  (monta mídia da biblioteca da sessão pelo NOME exato; aceita `position`
+  ('top' 0.18 · 'center' 0.5 · 'bottom' 0.81 · ou fração 0.02–0.98 do TOPO
+  do frame — o clipe nasce TRAVADO com posLock), `x` (−1..1, 0 = centro),
+  `zoom_pct` (40..200 — abaixo de 100 encolhe: logos/imagens largas),
+  `volume` (0.05..2.0) e `name` na MESMA chamada). Cada elemento nasce
+  no lugar certo em UM passo — SEM o update_clip extra pra posicionar (a
+  skill de estilo do usuário manda nas CONSTANTES do formato; o contrato
+  manda na régua). A cama de música já pode nascer renomeada music_* com
+  volume 0.7 (≈ −3 dB). Faixas extras: `timeline_add_track` (V3/A3/T2…)
+  antes de montar nelas
 - Visual: `visual_*` (color grading, punch-in, smart blur, auto reframe,
-  b-roll, overlay, inspect_frame)
+  b-roll — o `visual_insert_broll` também aceita position/x/zoom_pct na
+  criação: o b-roll de stock nasce posicionado, overlay,
+  inspect_frame)
 - Áudio: `audio_*` (ducking, normalize, enhance — `audio_enhance_voice` é o
   melhorador de voz do editor: SEM clip_id melhora TODOS os portadores de voz
   de uma vez (trilha de música e SFX poupados), a cadeia é a fixa do editor

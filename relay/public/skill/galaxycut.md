@@ -56,17 +56,17 @@ tempo real).
 - MONTAGEM — o clipe NASCE POSICIONADO (v1.7.6): `timeline_add_clip`
   (monta mídia da biblioteca da sessão pelo NOME exato; aceita `position`
   ('top' 0.18 · 'center' 0.5 · 'bottom' 0.81 · ou fração 0.02–0.98 do TOPO
-  — o clipe nasce TRAVADO com posLock), `x` (−1..1, 0 = centro),
+  do frame — o clipe nasce TRAVADO com posLock), `x` (−1..1, 0 = centro),
   `zoom_pct` (40..200 — abaixo de 100 encolhe: logos/imagens largas),
-  `volume` (0.05..2.0) e `name` na MESMA chamada). O frame da skill
-  Dynamic Shorts monta em UM passo por elemento: foto/b-roll
-  position='0.20' (zona de fotos 5–35%) · personagem position='bottom' ·
-  música já nasce name='music_fundo-shorts-luke' volume=0.7 — SEM o passo
-  extra de update_clip pra posicionar. Faixas extras:
-  `timeline_add_track` (V3/A3/T2…) antes de montar nelas
+  `volume` (0.05..2.0) e `name` na MESMA chamada). Cada elemento nasce
+  no lugar certo em UM passo — SEM o update_clip extra pra posicionar (a
+  skill de estilo do usuário manda nas CONSTANTES do formato; o contrato
+  manda na régua). A cama de música já pode nascer renomeada music_* com
+  volume 0.7 (≈ −3 dB). Faixas extras: `timeline_add_track` (V3/A3/T2…)
+  antes de montar nelas
 - Visual: `visual_*` (color grading, punch-in, smart blur, auto reframe,
   b-roll — o `visual_insert_broll` também aceita position/x/zoom_pct na
-  criação: o b-roll de stock nasce na zona de fotos ('0.20'), overlay,
+  criação: o b-roll de stock nasce posicionado, overlay,
   inspect_frame)
 - Áudio: `audio_*` (ducking, normalize, enhance — `audio_enhance_voice` é o
   melhorador de voz do editor: SEM clip_id melhora TODOS os portadores de voz

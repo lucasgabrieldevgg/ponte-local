@@ -40,6 +40,12 @@ tempo real).
 
 - Edição de timeline: `timeline_*` (split, reorder, remove_silences,
   remove_fillers, pacing curve, speed ramping)
+- REMOÇÃO (v1.7.7): `timeline_remove_clip` — o delete que faltava. Passe
+  `clip_id` (um) OU `clip_ids` (LOTE — 1 round-trip em vez de N; ids
+  inexistentes são reportados sem abortar o lote). Destrutivo auditável:
+  os nomes vão pro worklog; lote ≥10 exige `confirm: true` (a 1ª chamada
+  devolve a lista). O que fica, fica: vizinhos não se movem. Chegou a
+  hora de limpar o clipe errado — sem contorno de estacionar fora do quadro
 - Leitura & edição fina de clipes: `timeline_get_clips` (lê o conteúdo
   REAL: texto das legendas/transcrição, estilo, template — e a POSIÇÃO de
   TODO clipe {x, y, frac_top, locked} + volume: mídia, personagem e motion
@@ -52,7 +58,11 @@ tempo real).
   ajusta o VOLUME de áudio do clipe (param volume
   0.05..2.0 — 1 = unitário, 0.7 ≈ −3 dB; escreve no volume REAL: a prévia
   e o export leem o mesmo campo. Renomeie clipes de música pra `music_*`
-  pra as tools de voz os pouparem) — edição individual, clipe a clipe)
+  pra as tools de voz os pouparem) — edição individual, clipe a clipe.
+  ESTILO SIMÉTRICO (v1.7.7): `stroke_color`, `font`, `shadow`, `bold`,
+  `italic`, `highlight`, `highlight_color`, `highlight_anim` também
+  existem no update (aceita snake_case e camelCase) — mudar a COR DO
+  CONTORNO não exige mais recriar o clipe)
 - MONTAGEM — o clipe NASCE POSICIONADO (v1.7.6): `timeline_add_clip`
   (monta mídia da biblioteca da sessão pelo NOME exato; aceita `position`
   ('top' 0.18 · 'center' 0.5 · 'bottom' 0.81 · ou fração 0.02–0.98 do TOPO
@@ -173,12 +183,18 @@ editor, não o computador.
    próprio plano. Depois de propor, consulte `ponte_status` (campo
    `planPhase`) até virar `executing`; aí envie os passos UM A UM, na ordem
    aprovada. Passo fora da ordem exige `deviation_reason`.
+   PLANO TRAVADO (v1.7.7): passo que não conclui (ex.: word-sync que estoura
+   o worker) NÃO é mais cadeado — `plan_skip_step` (reason) pula o passo
+   corrente e segue pro próximo; `plan_abort` (reason) encerra o plano
+   inteiro (o trabalho feito PERMANECE — só o gate morre) e libera proposta
+   nova. A recusa "não é a ferramenta do passo corrente" ensina os 3 caminhos.
 2. **Destrutivo = confirmado.** Operação abrangente (acelerar TODOS os
    clipes, cortar mais de 20% da duração) devolve um gate pedindo
    `session_ask_clarification` com `gate_key`. A pergunta abre NA TELA do
    usuário e é ELE quem responde no app — você não consegue aprovar o
    próprio gate. Depois da aprovação, reenvie o comando com
-   `confirmed: true`.
+   `confirmed: true`. (Remoção de clipes em lote ≥10 segue a mesma régua
+   com `confirm: true` na própria `timeline_remove_clip`.)
 3. **Nunca afirme ação que não executou.** Só declare o que o result diz.
    Se falhou, diga que falhou e leia o `error` — ele sempre ensina o
    caminho.

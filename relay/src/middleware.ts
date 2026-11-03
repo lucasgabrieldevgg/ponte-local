@@ -12,7 +12,7 @@ export function middleware(req: NextRequest) {
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, x-ponte-token',
+        'Access-Control-Allow-Headers': 'Content-Type, x-ponte-token, x-beacon-key',
         'Access-Control-Max-Age': '86400',
       },
     });

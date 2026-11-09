@@ -359,9 +359,9 @@ export function createFirebaseBackend(rootEnv?: string): PonteBackend {
       const snap = await ref(`results/${ag}`)
         .orderByKey()
         .startAt(pad(since + 1))
-        .limitToFirst(MAX_RESULTS_SLICE)
+        .limitToFirst(MAX_RESULTS_SLICE + 1)
         .get();
-      const results: {
+      const lidos: {
         id: number; ok: boolean; data?: unknown; error?: string; durationMs?: number; ts: number;
       }[] = [];
       if (snap.exists()) {
@@ -369,7 +369,7 @@ export function createFirebaseBackend(rootEnv?: string): PonteBackend {
           snap.val() as Record<string, Record<string, unknown>>,
         )) {
           if (typeof row?.id !== 'number' || typeof row?.ok !== 'boolean') continue;
-          results.push({
+          lidos.push({
             id: row.id,
             ok: row.ok,
             data: row.data,
@@ -379,8 +379,10 @@ export function createFirebaseBackend(rootEnv?: string): PonteBackend {
           });
         }
       }
+      const hasMore = lidos.length > MAX_RESULTS_SLICE;
+      const results = hasMore ? lidos.slice(0, MAX_RESULTS_SLICE) : lidos;
       const lastId = results.length ? results[results.length - 1].id : since;
-      return { ok: true, results, lastId };
+      return { ok: true, results, lastId, hasMore };
     },
 
     async stats(): Promise<StatsOutcome> {

@@ -17,6 +17,9 @@
 //   R12 lease: comando não respondido volta pra fila após o lease
 //   R15 [t49] GET /skill/galaxycut.md → 200 · text/markdown · corpo byte a
 //        byte = SKILL.md raiz do fork (rota de módulo gerado, zero fs)
+//   R16 [t58] GET /results pagina COM HONESTIDADE — hasMore=true quando há
+//        resultados depois da página (100) e false no fim (a paginação mentia
+//        em silêncio e a IA achava que o histórico tinha sumido)
 //
 // Uso: npm run verify   (sobe o dev server sozinho na porta 3199 e mata no fim)
 //
@@ -171,6 +174,31 @@ export async function bateria(BASE, prefixo = '') {
   ok(
     res !== undefined && res.ok === true && res.data?.pong === true && b.lastId === cmdId,
     `${prefixo}R6 GET /results?since lê o resultado (IA web) — lastId é o próximo cursor`,
+  );
+
+  // --- R16 [t58]: paginação HONESTA — o hasMore diz se tem mais ---
+  // A lição veio do campo: /results cortava em 100 sem AVISAR, e a IA achava
+  // que o histórico tinha sumido (perdeu o contexto de sessões antigas). Agora
+  // a página confessa: hasMore=true = há mais depois desta página.
+  r = await fetch(`${BASE}/api/ponte/results?since=0`, { headers: { 'x-ponte-token': OPERATOR } });
+  b = await r.json();
+  const temCampo = typeof b.hasMore === 'boolean';
+  for (let i = 0; i < 101; i++) {
+    await fetch(`${BASE}/api/ponte/result`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-ponte-token': AGENT },
+      body: JSON.stringify({ id: 5000 + i, ok: true, data: { n: i }, durationMs: 1 }),
+    });
+  }
+  r = await fetch(`${BASE}/api/ponte/results?since=4999`, { headers: { 'x-ponte-token': OPERATOR } });
+  b = await r.json();
+  const paginaCheia = (b.results ?? []).length;
+  const temMais = b.hasMore === true;
+  r = await fetch(`${BASE}/api/ponte/results?since=5100`, { headers: { 'x-ponte-token': OPERATOR } });
+  const fim = await r.json();
+  ok(
+    temCampo && paginaCheia === 100 && temMais === true && fim.hasMore === false && (fim.results ?? []).length === 0,
+    `${prefixo}R16 [t58] /results pagina com honestidade — hasMore=true quando há mais (página de 100) e false no fim (a paginação não mente mais)`,
   );
 
   // --- R11: /status público sem segredos ---

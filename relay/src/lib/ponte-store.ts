@@ -207,8 +207,12 @@ export function pushResult(canal: Canal, r: PonteResult): void {
   if (canal.results.length > MAX_RESULTS) canal.results = canal.results.slice(-MAX_RESULTS);
 }
 
-export function resultsSince(canal: Canal, since: number): PonteResult[] {
-  return canal.results.filter((r) => r.id > since).slice(0, MAX_RESULTS_SLICE);
+export function resultsSince(canal: Canal, since: number): { results: PonteResult[]; hasMore: boolean } {
+  const pendentes = canal.results.filter((r) => r.id > since);
+  return {
+    results: pendentes.slice(0, MAX_RESULTS_SLICE),
+    hasMore: pendentes.length > MAX_RESULTS_SLICE,
+  };
 }
 
 /**
@@ -280,9 +284,9 @@ export function createMemoryBackend(): PonteBackend {
     async resultsSince(operatorToken, since) {
       const canal = canalPorOperador(operatorToken);
       if (canal === null) return { ok: false, status: 401 };
-      const results = resultsSince(canal, since);
+      const { results, hasMore } = resultsSince(canal, since);
       const lastId = results.length ? results[results.length - 1].id : since;
-      return { ok: true, results, lastId };
+      return { ok: true, results, lastId, hasMore };
     },
 
     async stats() {

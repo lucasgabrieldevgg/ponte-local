@@ -1,7 +1,9 @@
 // GET /api/ponte/results?since=N — a IA web lê os resultados dos comandos
 // que ela enfileirou. Header x-ponte-token = OPERATOR token (o do bloco).
-// Contrato da skill da casa: {ok, results, lastId} — o lastId é o próximo
-// cursor `since` da IA.
+// Contrato da skill da casa: {ok, results, lastId, hasMore} — o lastId é o
+// próximo cursor `since` da IA; o hasMore avisa que existem resultados
+// DEPOIS desta página (página de 100). Sem o hasMore a paginação mentia em
+// silêncio e a IA achava que o histórico tinha sumido.
 // t42: estado no backend escolhido (memória | Firebase RTDB).
 import { NextRequest } from 'next/server';
 import { getBackend } from '@/lib/backend';
@@ -18,7 +20,7 @@ export async function GET(req: NextRequest) {
     return Response.json({ ok: false, error: 'token de operador inválido' }, { status: 401 });
   }
   return Response.json(
-    { ok: true, results: r.results, lastId: r.lastId },
+    { ok: true, results: r.results, lastId: r.lastId, hasMore: r.hasMore },
     { headers: { 'cache-control': 'no-store' } },
   );
 }

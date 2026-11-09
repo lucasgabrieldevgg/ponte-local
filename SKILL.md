@@ -22,10 +22,13 @@ curl -s "$PONTE_URL/api/ponte/results?since=0" -H "x-ponte-token: $PONTE_TOKEN"
 ```
 
 Resposta de cada comando: `{"id","ok","data"|"error","durationMs"}`.
-`results?since=X` devolve `{"ok":true,"results":[...],"lastId":M}` — o
-`lastId` é o seu próximo cursor `since`. Resultado vazio: releia em 3–5 s
-(o app polla a cada 1,5 s; o round-trip típico é 5–15 s — honesto, não
-tempo real).
+`results?since=X` devolve `{"ok":true,"results":[...],"lastId":M,"hasMore":B}` — o
+`lastId` é o seu próximo cursor `since`. `hasMore:true` = há MAIS resultados
+além desta página (a página traz 100): continue lendo com `since=lastId` até
+`hasMore:false` — sem isso dá pra achar que o histórico acabou quando ele só
+continua (a lição veio do campo: a paginação mentia em silêncio). Resultado
+vazio: releia em 3–5 s (o app polla a cada 1,5 s; o round-trip típico é 5–15 s
+— honesto, não tempo real).
 
 ## Comece sempre assim
 
@@ -62,7 +65,9 @@ tempo real).
   ESTILO SIMÉTRICO (v1.7.7): `stroke_color`, `font`, `shadow`, `bold`,
   `italic`, `highlight`, `highlight_color`, `highlight_anim` também
   existem no update (aceita snake_case e camelCase) — mudar a COR DO
-  CONTORNO não exige mais recriar o clipe)
+  CONTORNO não exige mais recriar o clipe. Chave desconhecida é REJEITADA
+  com o nome certo ensinado (v1.7.11: `size` → `font_size`) — fim do
+  sucesso silencioso com `changes: []` que fingia aplicação)
 - MONTAGEM — o clipe NASCE POSICIONADO (v1.7.6): `timeline_add_clip`
   (monta mídia da biblioteca da sessão pelo NOME exato; aceita `position`
   ('top' 0.18 · 'center' 0.5 · 'bottom' 0.81 · ou fração 0.02–0.98 do TOPO
@@ -71,13 +76,15 @@ tempo real).
   `volume` (0.05..2.0) e `name` na MESMA chamada). Cada elemento nasce
   no lugar certo em UM passo — SEM o update_clip extra pra posicionar (a
   skill de estilo do usuário manda nas CONSTANTES do formato; o contrato
-  manda na régua). TIMING (medido): `start_s` é honrado só com a faixa
+  manda na régua). TIMING (medido): `start_sec` é honrado só com a faixa
   LIVRE no ponto; ocupada, o clipe cai no vão livre mais próximo (nunca
-  empilha) e imagem nasce com 4,8s — corrija o tempo com
-  `timeline_update_clip` (start_sec/duration_sec), que move pra dentro da
-  faixa ocupada e ajeita os vizinhos. RENDER (medido): fit-width —
-  W = zoom% × 1080 e H = W/aspecto; imagem vertical a zoom 100 transborda
-  a zona: calcule o zoom pelo aspecto. A cama de música já pode nascer renomeada music_* com
+  empilha) — o update_clip (start_sec/duration_sec) move pra dentro da
+  faixa ocupada e ajeita os vizinhos. IMAGEM: passe `duration_sec` NA
+  CRIAÇÃO (v1.7.11 — o default de 4,8s só vale se você omitir; 1 chamada
+  monta a imagem no lugar, tamanho e duração certos). RENDER (medido):
+  fit-width — W = zoom% × 1080 e H = W/aspecto; imagem vertical a zoom
+  100 transborda a zona: calcule o zoom pelo aspecto. A cama de música já
+  pode nascer renomeada music_* com
   volume 0.7 (≈ −3 dB). Faixas extras: `timeline_add_track` (V3/A3/T2…)
   antes de montar nelas
 - Visual: `visual_*` (color grading, punch-in, smart blur, auto reframe,
@@ -91,16 +98,22 @@ tempo real).
   é o MESMO que a prévia e o export leem · stems, beat match, bg music, sfx)
 - Legendas: `subtitle_*` (word-sync, preset, highlight, emojis).
   `subtitle_generate_word_sync` (medido): passe `target: 'clip_id'` +
-  `clip_id` do clipe de VOZ pra transcrever SÓ ele (~2 min, completa no
-  turno de 150s e o `data.segments` chega inteiro no resultado); SEM
-  target ele transcreve o MIX da timeline inteira (lento — estoura o teto
-  e os segments ficam PRESOS no resumo tardio, inutilizados).
+  `clip_id` do clipe de VOZ pra transcrever SÓ ele (v1.7.11: o teto do
+  worker é PROPORCIONAL à duração — 8× o áudio, piso 120s, cap 300s — e o
+  turno espera até 240s: um short de 20s completa em ~2 min e o
+  `data.segments` chega inteiro no resultado; se ainda assim estourar, o
+  resultado COMPLETO fica no job `late` do `ponte_status` — leia
+  `jobs[].lateResult.data` e alimente o apply_preset direto). SEM
+  target ele transcreve o MIX da timeline inteira (lento — estoura o teto).
   `subtitle_apply_preset` COM `segments` [{text,start,end}] CRIA os clipes
   de legenda (o preset + `custom_style_rules` — overrides de QUALQUER
   chave: font, color, strokeColor, strokeW, shadow, highlight,
   highlightColor, highlightAnim, typewriter, uppercase, size, bg… — e
   `position` como fração do TOPO do frame, ex. '0.43' = strip universal);
-  SEM segments ele só RESTILA as legendas que já existem na T1.
+  SEM segments ele RESTILA as legendas existentes na T1 — v1.7.11:
+  clipes com estilo editado individualmente (styleCustom) são POUPADOS e
+  listados (`include_styled: true` força) e o karaokê word-sync
+  (words) SOBREVIVE ao restyle.
 - Animação em código: `code_*` — 23 templates com física de verdade
   (spring/damped paramétrica): cinematic_title (letterbox + tracking
   dourado), word_pop (cinética palavra a palavra), zoom_punch (impacto com
@@ -122,16 +135,28 @@ tempo real).
   Parâmetros de física — intensity (0.25 suave a 2 agressivo),
   easing (expo/back/spring/elastic/cubic), direction (left/right/up/down) —
   vão em `code_inject_to_timeline_track` e em `timeline_update_clip`
-  (motion_intensity/motion_easing/motion_direction)
+  (motion_intensity/motion_easing/motion_direction). O `code_inject`
+  aceita `deviation_reason` (dentro de `args` OU no nível-topo do
+  comando — v1.7.11) e tem teto de comando próprio de 16.000 chars:
+  o tsx_code inteiro cabe SEM cortar o motivo do desvio
 - Animação de entrada em clipes NORMAIS: `timeline_apply_transition` com
   kind=entrance_animation — fadeIn ("Fade Suave"), spinIn ("Giro 360°"),
   zoomIn, popIn, typewriter… em qualquer clipe (vídeo, imagem, legenda),
-  duration 0.1–3 s. Com kind=transition, a mesma tool anima a JUNÇÃO com o clipe
+  duration 0.1–3 s e `delay` 0–10 s (v1.7.11: a animação espera `delay`
+  segundos DEPOIS do início do clipe — sincronize com a PALAVRA sem
+  atrasar o clipe; ex.: clipe em 0,70s + delay 0,35 = giro começa 1,05s).
+  Com kind=transition, a mesma tool anima a JUNÇÃO com o clipe
   anterior (dissolve, slide, wipe, zoom, flash, blur + as 8 do Pacote
   Cinema)
 - Estilo: `style_*` (DNA) · Marketing: `marketing_*` (thumbnail, metadata)
 - Memória da sessão: `memory_*` (read/write worklog, snapshots)
-- Mídia: `media_*` (import de pasta local, download de URL, busca de stock)
+- Mídia: `media_*` (import de pasta local, download de URL, busca de
+  stock, listagem completa). `media_import_local_folder` (v1.7.11):
+  caminho ABSOLUTO ou RELATIVO à raiz da concessão ("Personagem"
+  resolve sozinho) e RECURSIVO por padrão (subpastas entram juntas,
+  lote ≤ 50). `media_list` (v1.7.11): a biblioteca INTEIRA sem truncar
+  (nome exato pro timeline_add_clip) + a árvore da concessão com a
+  marca importado/não — o fim da arqueologia de nomes
 - Modelos locais: `local_models_status` (leitura sem risco: estado REAL do que
   está instalado — Ollama respondendo? quais tags? Whisper em cache? se faltar
   algo, PEÇA ao usuário com o caminho que vem em requests; nunca finja estado)
@@ -166,6 +191,17 @@ vídeo ATIVO sob ele. Tetos honestos: 8 decodes por janela de 180s (cache
 não conta — mesma fonte+tempo = mesmo frame, reutilize), largura máx.
 640px; a recusa do teto ensina a priorizar (achados severity=erro
 primeiro).
+
+## O espelho — capture e VEJA a COMPOSIÇÃO (`timeline_capture_composite`)
+
+O frame do FONTE mostra o fundo; o ESPELHO (v1.7.11) mostra o frame
+MONTADO: fundo + personagem + imagens + legendas + motion graphics,
+EXATAMENTE como o export renderiza (o MESMO compositor, canvas 480px).
+Passe `at_sec` e OLHE em `bulk.image_base64` (JPEG ≤64KB). Regra de
+trabalho: monte → estile → `timeline_capture_composite` nos momentos
+chave (hook, impacto, uma foto, o fim) → VEJA tamanho, contraste,
+posição e poluição → corrija → capture de novo. O usuário deixa de ser o
+QA de layout de vocês dois.
 
 ## Fronteira PERMANENTE — não existe, não tente
 
@@ -252,12 +288,13 @@ USUÁRIO a religar no app, e é ele quem decide.
 
 | Limite | Valor |
 |--------|-------|
-| Tamanho do comando | 4.000 caracteres |
+| Tamanho do comando | 4.000 caracteres (16.000 p/ `code_inject_to_timeline_track` — v1.7.11) |
 | Resposta do comando | 150.000 caracteres (corte SEMPRE rotulado) |
 | Fila de comandos pendentes | 100 |
-| Histórico de resultados | 400 |
+| Histórico de resultados | 400 (página de 100 por leitura — `hasMore` diz se tem mais; leia até `hasMore:false`) |
 | Janela "conectado" | 15 s sem poll |
 | Lease de entrega | 120 s (reenvio sem reexecução — ids únicos por comando) |
+| Teto do turno externo | 240 s (v1.7.11 — cobre o word-sync proporcional; resultado tardio COMPLETO no job `late` do `ponte_status`) |
 
 ## Pareamento e token (prática segura)
 

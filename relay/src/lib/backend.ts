@@ -59,7 +59,7 @@ export type AddCommandOutcome =
   | { ok: false; status: 429; error: string };
 
 export type ResultsSinceOutcome =
-  | { ok: true; results: PonteResult[]; lastId: number }
+  | { ok: true; results: PonteResult[]; lastId: number; hasMore: boolean }
   | { ok: false; status: 401 };
 
 export type StatsOutcome = {
@@ -85,7 +85,10 @@ export interface PonteBackend {
     action: string,
     args?: Record<string, unknown>,
   ): Promise<AddCommandOutcome>;
-  /** GET /results?since — a IA web lê os resultados (lastId = próximo since). */
+  /** GET /results?since — a IA web lê os resultados (lastId = próximo since).
+   *  hasMore = true quando há resultados DEPOIS desta página (a página traz
+   *  MAX_RESULTS_SLICE): sem esse campo a IA achava que o histórico tinha
+   *  acabado (a paginação mentia em silêncio — lição do campo). */
   resultsSince(operatorToken: string | null, since: number): Promise<ResultsSinceOutcome>;
   /** GET /status — público, SEM segredos. */
   stats(): Promise<StatsOutcome>;

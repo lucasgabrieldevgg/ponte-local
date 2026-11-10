@@ -59,7 +59,7 @@ vazio: releia em 3–5 s (o app polla a cada 1,5 s; o round-trip típico é 5–
   topo — bottom-anchored) ou fração 0.02–0.98 do TOPO ('0.43' = strip
   universal de legenda), move de faixa com track, muda estilo/template e
   ajusta o VOLUME de áudio do clipe (param volume
-  0.05..2.0 — 1 = unitário, 0.7 ≈ −3 dB; escreve no volume REAL: a prévia
+  0..2.0 — 1 = unitário, 0.7 ≈ −3 dB, 0 = MUDO; escreve no volume REAL: a prévia
   e o export leem o mesmo campo. Renomeie clipes de música pra `music_*`
   pra as tools de voz os pouparem) — edição individual, clipe a clipe.
   ESTILO SIMÉTRICO (v1.7.7): `stroke_color`, `font`, `shadow`, `bold`,
@@ -73,7 +73,7 @@ vazio: releia em 3–5 s (o app polla a cada 1,5 s; o round-trip típico é 5–
   ('top' 0.18 · 'center' 0.5 · 'bottom' 0.81 · ou fração 0.02–0.98 do TOPO
   do frame — o clipe nasce TRAVADO com posLock), `x` (−1..1, 0 = centro),
   `zoom_pct` (40..200 — abaixo de 100 encolhe: logos/imagens largas),
-  `volume` (0.05..2.0) e `name` na MESMA chamada). Cada elemento nasce
+  `volume` (0..2.0, 0 = mudo) e `name` na MESMA chamada). Cada elemento nasce
   no lugar certo em UM passo — SEM o update_clip extra pra posicionar (a
   skill de estilo do usuário manda nas CONSTANTES do formato; o contrato
   manda na régua). TIMING (medido): `start_sec` é honrado só com a faixa
@@ -228,9 +228,11 @@ editor, não o computador.
    clipes, cortar mais de 20% da duração) devolve um gate pedindo
    `session_ask_clarification` com `gate_key`. A pergunta abre NA TELA do
    usuário e é ELE quem responde no app — você não consegue aprovar o
-   próprio gate. Depois da aprovação, reenvie o comando com
-   `confirmed: true`. (Remoção de clipes em lote ≥10 segue a mesma régua
-   com `confirm: true` na própria `timeline_remove_clip`.)
+   próprio gate: mandar `confirmed: true` na PRIMEIRA chamada NÃO libera
+   nada (o gate recusa e exige o SIM registrado na sessão). Depois da
+   aprovação, reenvie o comando com `confirmed: true`. (Remoção de clipes
+   em lote ≥10 segue a mesma régua com `confirm: true` na própria
+   `timeline_remove_clip`.)
 3. **Nunca afirme ação que não executou.** Só declare o que o result diz.
    Se falhou, diga que falhou e leia o `error` — ele sempre ensina o
    caminho.

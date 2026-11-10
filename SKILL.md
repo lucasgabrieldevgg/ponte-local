@@ -42,7 +42,12 @@ vazio: releia em 3–5 s (o app polla a cada 1,5 s; o round-trip típico é 5–
 ## As ações (lista fixa — derivada do registry do app)
 
 - Edição de timeline: `timeline_*` (split, reorder, remove_silences,
-  remove_fillers, pacing curve, speed ramping)
+  remove_fillers, pacing curve, speed ramping). [t84/P0] O corte de
+  silêncio/filler devolve o MAPA: `data.speech_segments` (o trecho no
+  arquivo ⇄ o `clip_id` novo ⇄ onde ele ficou na timeline),
+  `data.removed_ranges` (o que saiu), `data.clips_created` e
+  `data.new_duration_sec` — o mapa também vem no `summary`. Use o
+  `clip_id` do mapa para editar um bloco específico depois
 - REMOÇÃO (v1.7.7): `timeline_remove_clip` — o delete que faltava. Passe
   `clip_id` (um) OU `clip_ids` (LOTE — 1 round-trip em vez de N; ids
   inexistentes são reportados sem abortar o lote). Destrutivo auditável:
@@ -103,8 +108,14 @@ vazio: releia em 3–5 s (o app polla a cada 1,5 s; o round-trip típico é 5–
   turno espera até 240s: um short de 20s completa em ~2 min e o
   `data.segments` chega inteiro no resultado; se ainda assim estourar, o
   resultado COMPLETO fica no job `late` do `ponte_status` — leia
-  `jobs[].lateResult.data` e alimente o apply_preset direto). SEM
-  target ele transcreve o MIX da timeline inteira (lento — estoura o teto).
+  `jobs[].lateResult.data` e alimente o apply_preset direto). [t83/P0]
+  ORÇAMENTO: sem o servidor Whisper local configurado, o wasm custa ~6–8×
+  o tempo real do áudio — uma janela grande é RECUSADA NA HORA (orçamento
+  estourado: NADA roda e a ponte não fica presa). Nesse caso use
+  `target: 'clip_id'` (o clipe de voz), uma janela menor
+  (`start_sec`/`end_sec`), o servidor Whisper local ou o modelo tiny. O
+  retorno traz o CUSTO REAL (tempo de parede + razão medida nesta máquina).
+  SEM target ele transcreve o MIX da timeline inteira (lento — estoura o teto).
   `subtitle_apply_preset` COM `segments` [{text,start,end}] CRIA os clipes
   de legenda (o preset + `custom_style_rules` — overrides de QUALQUER
   chave: font, color, strokeColor, strokeW, shadow, highlight,

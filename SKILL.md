@@ -101,6 +101,16 @@ vazio: releia em 3–5 s (o app polla a cada 1,5 s; o round-trip típico é 5–
   de uma vez (trilha de música e SFX poupados), a cadeia é a fixa do editor
   (highpass → compressor → limitador → +20% de ganho) e o campo que escreve
   é o MESMO que a prévia e o export leem · stems, beat match, bg music, sfx)
+  [t85/P0] `audio_analyze_peaks` — O ÁUDIO MEDIDO (a régua que faltava): uma
+  chamada devolve `envelope` (RMS por janela em dBFS), `speech_segments`
+  (onde tem FALA), `silences` (os vãos, com o comprimento) e `onsets` (os
+  ATAQUES DE SÍLABA). Use-o ANTES de montar: corta na PAUSA (não no meio da
+  palavra), entra a imagem NA SÍLABA (não onde você chutou) e escala o b-roll
+  no RESPIRO (não sobre a voz). `clip_id` = clipe da timeline (os tempos
+  `timeline_start`/`timeline_end` já vêm na timeline); `media_name` = item
+  da aba Mídia. Sem argumento, mede o primeiro clipe de voz. MEDIDO: o
+  word-sync custa minutos; isto custa SEGUNDOS — e substitui a estimativa
+  proporcional, que erra em vídeo longo.
 - Legendas: `subtitle_*` (word-sync, preset, highlight, emojis).
   `subtitle_generate_word_sync` (medido): passe `target: 'clip_id'` +
   `clip_id` do clipe de VOZ pra transcrever SÓ ele (v1.7.11: o teto do

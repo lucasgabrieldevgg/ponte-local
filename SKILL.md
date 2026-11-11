@@ -161,14 +161,21 @@ vazio: releia em 3–5 s (o app polla a cada 1,5 s; o round-trip típico é 5–
   comando — v1.7.11) e tem teto de comando próprio de 16.000 chars:
   o tsx_code inteiro cabe SEM cortar o motivo do desvio
 - Animação de entrada em clipes NORMAIS: `timeline_apply_transition` com
-  kind=entrance_animation — fadeIn ("Fade Suave"), spinIn ("Giro 360°"),
-  zoomIn, popIn, typewriter… em qualquer clipe (vídeo, imagem, legenda),
-  duration 0.1–3 s e `delay` 0–10 s (v1.7.11: a animação espera `delay`
-  segundos DEPOIS do início do clipe — sincronize com a PALAVRA sem
-  atrasar o clipe; ex.: clipe em 0,70s + delay 0,35 = giro começa 1,05s).
-  Com kind=transition, a mesma tool anima a JUNÇÃO com o clipe
+  `kind="entrance_animation"` E `animation="<tipo>"` — DOIS campos, o
+  primeiro diz O QUÊ (é animação, não junção), o segundo diz QUAL
+  (fadeIn = "Fade Suave", spinIn = "Giro 360°", zoomIn, popIn, typewriter…),
+  em qualquer clipe (vídeo, imagem, legenda), duration 0.1–3 s e `delay`
+  0–10 s (v1.7.11: a animação espera `delay` segundos DEPOIS do início do
+  clipe — sincronize com a PALAVRA sem atrasar o clipe; ex.: clipe em
+  0,70s + delay 0,35 = giro começa 1,05s).
+  Com kind="transition", a mesma tool anima a JUNÇÃO com o clipe
   anterior (dissolve, slide, wipe, zoom, flash, blur + as 8 do Pacote
-  Cinema)
+  Cinema) e o campo `animation` não se aplica
+- Sessão e plano: `plan_*` (propose, abort, skip_step), `subagent_*`
+  (delegate_task), `session_*` (ask_clarification, request_human_review,
+  finish_and_render). `plan_propose` EXIGE `request` (o pedido do
+  usuário em 1 frase — vai no cabeçalho do plano) + `steps` (1-12 passos
+  com action, tool, target, done_criterion, params)
 - Estilo: `style_*` (DNA) · Marketing: `marketing_*` (thumbnail, metadata)
 - Memória da sessão: `memory_*` (read/write worklog, snapshots)
 - Mídia: `media_*` (import de pasta local, download de URL, busca de
@@ -181,8 +188,6 @@ vazio: releia em 3–5 s (o app polla a cada 1,5 s; o round-trip típico é 5–
 - Modelos locais: `local_models_status` (leitura sem risco: estado REAL do que
   está instalado — Ollama respondendo? quais tags? Whisper em cache? se faltar
   algo, PEÇA ao usuário com o caminho que vem em requests; nunca finja estado)
-- Sessão e plano: `plan_*` (propose), `subagent_*` (delegate_task), `session_*`
-  (ask_clarification, request_human_review, finish_and_render)
 - Meta-ações da ponte: `ponte_ping`, `ponte_get_context`, `ponte_status`
 
 A lista é derivada do registry do app e ACOMPANHA ele sozinha: a contagem
@@ -236,15 +241,28 @@ editor, não o computador.
 ## Regras de ouro
 
 1. **Plano primeiro.** Lote de mutação = proponha com `plan_propose` ANTES
-   de executar. O usuário aprova NO APP (card de plano) — você não aprova o
-   próprio plano. Depois de propor, consulte `ponte_status` (campo
-   `planPhase`) até virar `executing`; aí envie os passos UM A UM, na ordem
-   aprovada. Passo fora da ordem exige `deviation_reason`.
-   PLANO TRAVADO (v1.7.7): passo que não conclui (ex.: word-sync que estoura
-   o worker) NÃO é mais cadeado — `plan_skip_step` (reason) pula o passo
-   corrente e segue pro próximo; `plan_abort` (reason) encerra o plano
-   inteiro (o trabalho feito PERMANECE — só o gate morre) e libera proposta
-   nova. A recusa "não é a ferramenta do passo corrente" ensina os 3 caminhos.
+   de executar. O `plan_propose` EXIGE `request` (o pedido do usuário em
+   1 frase) + `steps` (1-12 passos com action, tool, target,
+   done_criterion, params). O usuário aprova NO APP (card de plano) — você
+   não aprova o próprio plano. Depois de propor, consulte `ponte_status`
+   (campo `planPhase`) até virar `executing`; aí envie os passos UM A UM,
+   na ordem aprovada.
+   O PLANO NÃO É CARCEIRO (v1.7.13, medido no campo):
+   - `done_criterion` é VERIFICÁVEL pelo app: escreva no formato que o app
+     mede ("timeline = 5,00 s", "5 clipes", "3 legendas", "2 animações",
+     "nenhum vídeo mudado") e o app FECHA o passo sozinho quando a
+     timeline já estiver no estado — um passo satisfied não trava o resto;
+   - DESVIO É O CAMINHO NORMAL: ferramenta vizinha à do passo corrente
+     EXECUTA e fica REGISTRADA (com `deviation_reason` dizendo o porquê).
+     Não gaste round-trips recambiando a mesma tool até ela passar;
+   - `plan_skip_step` (reason) pula um passo que não conclui (ex.:
+     word-sync que estoura o worker); `plan_abort` (reason) encerra o
+     plano (o trabalho feito PERMANECE — só o gate morre);
+   - o plano EXPIRA sozinho: ócio de 30 min sem comando ou o
+     `session_finish_and_render` fecham o gate (virando `abandoned`).
+     Se o `ponte_status` mostrar `planPhase` diferente de `executing`
+     quando você esperava `executing`, o plano já morreu — PROPONHA OUTRO
+     (`plan_propose`), não force.
 2. **Destrutivo = confirmado.** Operação abrangente (acelerar TODOS os
    clipes, cortar mais de 20% da duração) devolve um gate pedindo
    `session_ask_clarification` com `gate_key`. A pergunta abre NA TELA do

@@ -100,7 +100,11 @@ vazio: releia em 3–5 s (o app polla a cada 1,5 s; o round-trip típico é 5–
   melhorador de voz do editor: SEM clip_id melhora TODOS os portadores de voz
   de uma vez (trilha de música e SFX poupados), a cadeia é a fixa do editor
   (highpass → compressor → limitador → +20% de ganho) e o campo que escreve
-  é o MESMO que a prévia e o export leem · stems, beat match, bg music, sfx)
+  é o MESMO que a prévia e o export leem · `audio_normalize_loudness`
+  (MEDIDO: sem `clip_id`/`track_index` ele decodifica a timeline INTEIRA —
+  5 min com 0 % no campo; com `clip_id` paga UM clipe e com `track_index`
+  UMA faixa, e o retorno narra o custo real em PCM × relógio · stems, beat
+  match, bg music, sfx)
   [t85/P0] `audio_analyze_peaks` — O ÁUDIO MEDIDO (a régua que faltava): uma
   chamada devolve `envelope` (RMS por janela em dBFS), `speech_segments`
   (onde tem FALA), `silences` (os vãos, com o comprimento) e `onsets` (os

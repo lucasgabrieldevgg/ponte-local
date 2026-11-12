@@ -47,7 +47,13 @@ vazio: releia em 3–5 s (o app polla a cada 1,5 s; o round-trip típico é 5–
   arquivo ⇄ o `clip_id` novo ⇄ onde ele ficou na timeline),
   `data.removed_ranges` (o que saiu), `data.clips_created` e
   `data.new_duration_sec` — o mapa também vem no `summary`. Use o
-  `clip_id` do mapa para editar um bloco específico depois
+  `clip_id` do mapa para editar um bloco específico depois. [t90/P0] O
+  `timeline_apply_pacing_curve` é RETIME, não corte novo: acelera as
+  tomadas da V1 até a média alvo (presets com teto: mrbeast_fast 1,6 s/2,5×
+  · educational_balanced 3,0 s/1,75× · cinematic_calm 6,0 s/1,25×) e
+  devolve `data.cuts_created: 0`, média antes/depois e o residual. Se o
+  teto impedir o alvo, CORTE conteúdo (`remove_silences`/`remove_fillers`)
+  ou insira b-roll — nenhuma velocidade resolve sem descartar material.
 - REMOÇÃO (v1.7.7): `timeline_remove_clip` — o delete que faltava. Passe
   `clip_id` (um) OU `clip_ids` (LOTE — 1 round-trip em vez de N; ids
   inexistentes são reportados sem abortar o lote). Destrutivo auditável:
